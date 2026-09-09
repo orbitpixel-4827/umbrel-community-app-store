@@ -11,7 +11,7 @@ La tienda ya está configurada y permanecerá vacía hasta que se añadan aplica
 3. Pega esta URL:
 
 ```text
-https://github.com/DanyVanVargas/umbrel-community-app-store
+https://github.com/orbitpixel-4827/umbrel-community-app-store
 ```
 
 4. Confirma la incorporación de la tienda.
@@ -20,10 +20,10 @@ Mientras el repositorio no contenga carpetas de aplicaciones, la tienda aparecer
 
 ## Añadir aplicaciones en el futuro
 
-Cada aplicación se añadirá en una carpeta independiente cuyo nombre y `id` comiencen con el prefijo de la tienda: `danyvanvargas-`.
+Cada aplicación se añadirá en una carpeta independiente cuyo nombre y `id` comiencen con el prefijo de la tienda: `experimental-`.
 
 ```text
-danyvanvargas-mi-app/
+experimental-mi-app/
 ├── umbrel-app.yml
 ├── docker-compose.yml
 ├── exports.sh          # opcional
@@ -34,6 +34,6 @@ Las aplicaciones se adaptarán una por una para que Umbrel ejecute sus servicios
 
 ## Identidad de la tienda
 
-- ID: `danyvanvargas`
+- ID: `experimental`
 - Nombre visible: `Experimental App Store`
 - Manifiesto: `umbrel-app-store.yml`
