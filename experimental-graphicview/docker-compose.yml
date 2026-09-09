@@ -7,8 +7,9 @@ services:
       APP_PORT: 3000
 
   web:
-    build: .
-    image: experimental-graphicview:1.0.1
+    image: ghcr.io/orbitpixel-4827/graphicview:1.0.2
+    user: "1000:1000"
+    init: true
     restart: on-failure
     stop_grace_period: 30s
     environment:
