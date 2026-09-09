@@ -1,0 +1,24 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: experimental-graphicview_web_1
+      APP_PORT: 3000
+
+  web:
+    build: .
+    image: experimental-graphicview:1.0.1
+    restart: on-failure
+    stop_grace_period: 30s
+    environment:
+      MERCADO_DATA_DIR: /data
+      TZ: America/Mexico_City
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

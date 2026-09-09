@@ -1,0 +1,26 @@
+manifestVersion: 1
+id: experimental-graphicview
+name: GraphicView
+tagline: Análisis técnico visual para tus mercados
+icon: icon.png
+category: finance
+version: "1.0.1"
+port: 3080
+description: >-
+  Sigue Bitcoin desde Bitfinex, acciones, ETF e índices mediante gráficos
+  configurables, medias móviles y herramientas de dibujo. Conserva tus favoritos,
+  indicadores y análisis incluso después de reiniciar la aplicación.
+developer: Experimental Labs
+website: ""
+submitter: Experimental Labs
+submission: ""
+repo: ""
+support: ""
+gallery: []
+releaseNotes: >-
+  Primera versión de GraphicView para Experimental App Store, con almacenamiento
+  persistente y acceso protegido por el proxy de Umbrel.
+dependencies: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""

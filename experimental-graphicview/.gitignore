@@ -1,0 +1,6 @@
+node_modules/
+.next/
+data/*
+!data/.gitkeep
+.DS_Store
+*.log
