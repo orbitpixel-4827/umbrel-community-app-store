@@ -2,9 +2,9 @@ manifestVersion: 1
 id: experimental-graphicview
 name: GraphicView
 tagline: Análisis técnico visual para tus mercados
-icon: icon.png
+icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-graphicview/icon.png
 category: finance
-version: "1.0.1"
+version: "1.0.2"
 port: 3080
 description: >-
   Sigue Bitcoin desde Bitfinex, acciones, ETF e índices mediante gráficos
@@ -18,8 +18,8 @@ repo: ""
 support: ""
 gallery: []
 releaseNotes: >-
-  Primera versión de GraphicView para Experimental App Store, con almacenamiento
-  persistente y acceso protegido por el proxy de Umbrel.
+  Corrige la instalación desde Umbrel mediante una imagen multiplataforma y muestra
+  correctamente el icono de GraphicView.
 dependencies: []
 path: ""
 defaultUsername: ""
