@@ -1,4 +1,4 @@
-# DanyVanVargas App Store
+# Experimental App Store
 
 Tienda comunitaria personal para instalar aplicaciones reales en umbrelOS.
 
@@ -35,5 +35,5 @@ Las aplicaciones se adaptarán una por una para que Umbrel ejecute sus servicios
 ## Identidad de la tienda
 
 - ID: `danyvanvargas`
-- Nombre visible: `DanyVanVargas App Store`
+- Nombre visible: `Experimental App Store`
 - Manifiesto: `umbrel-app-store.yml`
