@@ -3,9 +3,9 @@
 import {
   Activity, Apple as AppleIcon, BarChart3, Bitcoin, Blocks, Building2, CarFront,
   ChartNoAxesCombined, ChevronDown, ChevronLeft, ChevronRight, Cpu, Crosshair, Eye, EyeOff,
-  LineChart, LocateFixed, Minus, MousePointer2, Palette, PanelRightClose,
+  LineChart, LocateFixed, Lock, Minus, MousePointer2, Palette, PanelRightClose,
   PanelRightOpen, PanelsTopLeft, Plus, RectangleHorizontal, Search, SlidersHorizontal, Star,
-  Trash2, TrendingUp, Type as TypeIcon, Ruler, Undo2, X,
+  Trash2, TrendingUp, Type as TypeIcon, Ruler, Undo2, Unlock, X,
 } from 'lucide-react';
 import { PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -91,6 +91,7 @@ export default function Home() {
   const [indicatorStyles, setIndicatorStyles] = useState<Record<string, IndicatorStyle>>({ sma20: { color: '#b447da', opacity: .92, width: 3.2 }, sma200: { color: '#ed4d59', opacity: .92, width: 3.8 } });
   const [selectedIndicator, setSelectedIndicator] = useState<string | null>('sma20');
   const [showStudies, setShowStudies] = useState(true);
+  const [studiesLocked, setStudiesLocked] = useState(false);
   const [favoritesOpen, setFavoritesOpen] = useState(true);
   const [toolsOpen, setToolsOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -114,6 +115,7 @@ export default function Home() {
   const [textPlacement, setTextPlacement] = useState<DataPoint | null>(null);
   const [newText, setNewText] = useState('');
   const [ready, setReady] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
   const panRef = useRef<{ x: number; offset: number } | null>(null);
   const scaleRef = useRef<{ y: number; scale: number } | null>(null);
   const dragRef = useRef<{ id: number; anchor: DataPoint; originalStart: DataPoint; originalEnd: DataPoint; originalThird?: DataPoint } | null>(null);
@@ -125,6 +127,14 @@ export default function Home() {
   const drawingKey = `${symbol}:${timeframe}`;
   const currentDrawings = drawings[drawingKey] ?? [];
   const averages = useMemo(() => ({ sma20: movingAverage(candles, 20), sma200: movingAverage(candles, 200) }), [candles]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 680px)');
+    const update = () => setIsCompact(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,6 +149,7 @@ export default function Home() {
         if (state.timeframe) setTimeframe(state.timeframe);
         if (state.indicators) setIndicators(state.indicators.filter((id: string) => ['sma20', 'sma200'].includes(id)));
         if (state.indicatorStyles) setIndicatorStyles(state.indicatorStyles);
+        if (typeof state.studiesLocked === 'boolean') setStudiesLocked(state.studiesLocked);
         if (state.colors) setColors(state.colors);
         if (state.drawings) setDrawings(state.drawings);
         if (state.favorites) setFavorites(state.favorites);
@@ -153,6 +164,7 @@ export default function Home() {
             if (state.timeframe) setTimeframe(state.timeframe);
             if (state.indicators) setIndicators(state.indicators.filter((id: string) => ['sma20', 'sma200'].includes(id)));
             if (state.indicatorStyles) setIndicatorStyles(state.indicatorStyles);
+            if (typeof state.studiesLocked === 'boolean') setStudiesLocked(state.studiesLocked);
             if (state.colors) setColors(state.colors);
             if (state.drawings) setDrawings(state.drawings);
             if (state.favorites) setFavorites(state.favorites);
@@ -167,11 +179,11 @@ export default function Home() {
 
   useEffect(() => {
     if (!ready) return;
-    const state = { symbol, timeframe, indicators, indicatorStyles, colors, drawings, favorites, catalog };
+    const state = { symbol, timeframe, indicators, indicatorStyles, studiesLocked, colors, drawings, favorites, catalog };
     localStorage.setItem('mercado-workspace-v2', JSON.stringify(state));
     const timer = window.setTimeout(() => fetch('/api/workspace', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state) }).catch(() => {}), 350);
     return () => window.clearTimeout(timer);
-  }, [symbol, timeframe, indicators, indicatorStyles, colors, drawings, favorites, catalog, ready]);
+  }, [symbol, timeframe, indicators, indicatorStyles, studiesLocked, colors, drawings, favorites, catalog, ready]);
 
   useEffect(() => {
     const context = (document as Document & { modelContext?: { registerTool: (tool: Record<string, unknown>, options?: { signal: AbortSignal }) => void | Promise<void> } }).modelContext;
@@ -286,6 +298,7 @@ export default function Home() {
   }
 
   function pointerDown(event: PointerEvent<SVGSVGElement>) {
+    event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     const screen = screenPoint(event);
     setCrosshair(screen);
@@ -368,6 +381,20 @@ export default function Home() {
     setSelectedDrawing(draft.id); setDraft(null); setActiveTool('cursor');
   }
 
+  function toggleStudiesLock() {
+    setStudiesLocked((locked) => {
+      const next = !locked;
+      if (next) {
+        setSelectedDrawing(null);
+        setSelectedIndicator(null);
+        setActiveTool('cursor');
+        setDraft(null);
+        setFibExtStage(0);
+      }
+      return next;
+    });
+  }
+
   function chooseAsset(next: Asset, add = false) {
     setCatalog((items) => items.some((item) => item.symbol === next.symbol) ? items : [...items, next]);
     if (add) setFavorites((items) => items.includes(next.symbol) ? items : [...items, next.symbol]);
@@ -400,27 +427,27 @@ export default function Home() {
     const x1 = chart.x(drawing.start.index), x2 = chart.x(drawing.end.index), y1 = chart.y(drawing.start.price), y2 = chart.y(drawing.end.price);
     const width = drawing.width ?? (drawing.kind === 'trend' ? 3 : 2), opacity = drawing.opacity ?? 1;
     const select = (event: PointerEvent<SVGElement>) => {
-      if (activeTool !== 'cursor') return;
+      if (activeTool !== 'cursor' || studiesLocked) return;
       event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId);
       setSelectedDrawing(drawing.id); setActiveTool('cursor');
       dragRef.current = { id: drawing.id, anchor: chart.fromScreen(pointFromClient(event.clientX, event.clientY, event.currentTarget)), originalStart: drawing.start, originalEnd: drawing.end, originalThird: drawing.third };
     };
-    const selected = drawing.id === selectedDrawing && activeTool === 'cursor';
+    const selected = !studiesLocked && drawing.id === selectedDrawing && activeTool === 'cursor';
     const resize = (event: PointerEvent<SVGCircleElement>) => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); resizeRef.current = { id: drawing.id, kind: drawing.kind, startClientX: event.clientX, initialFontSize: drawing.fontSize ?? 18 }; };
     const textW = Math.max(45, (drawing.text?.length ?? 1) * (drawing.fontSize ?? 18) * .62);
     const handleX = drawing.kind === 'text' ? x1 + textW : x2, handleY = drawing.kind === 'hline' ? y1 : drawing.kind === 'text' ? y1 - (drawing.fontSize ?? 18) / 2 : y2;
     const handle = selected ? <circle className="resize-handle" cx={handleX} cy={handleY} r="6" onPointerDown={resize} /> : null;
-    if (drawing.kind === 'hline') return <g key={drawing.id} onPointerDown={select} className="movable-drawing" opacity={opacity}><line x1={x1} y1={y1} x2={x2} y2={y1} stroke={drawing.color} strokeWidth={width} /><line x1={x1} y1={y1} x2={x2} y2={y1} stroke="transparent" strokeWidth="16" />{handle}</g>;
-    if (drawing.kind === 'text') return <g key={drawing.id} onPointerDown={select} className="movable-drawing" opacity={opacity}><text x={x1} y={y1} fill={drawing.color} fontSize={drawing.fontSize ?? 18} fontWeight="600">{drawing.text}</text><rect x={x1 - 6} y={y1 - (drawing.fontSize ?? 18)} width={textW} height={(drawing.fontSize ?? 18) + 10} fill="transparent" stroke={selected ? drawing.color : 'transparent'} strokeDasharray="4 3" />{handle}</g>;
-    if (drawing.kind === 'rect') return <g key={drawing.id} onPointerDown={select} className="movable-drawing" opacity={opacity}><rect x={Math.min(x1, x2)} y={Math.min(y1, y2)} width={Math.abs(x2 - x1)} height={Math.abs(y2 - y1)} fill={drawing.color} fillOpacity=".13" stroke={drawing.color} strokeWidth={width} /><rect x={Math.min(x1, x2) - 5} y={Math.min(y1, y2) - 5} width={Math.abs(x2 - x1) + 10} height={Math.abs(y2 - y1) + 10} fill="transparent" stroke="transparent" strokeWidth="10" />{handle}</g>;
-    if (drawing.kind === 'trend') return <g key={drawing.id} onPointerDown={select} className="movable-drawing" opacity={opacity}><line x1={x1} y1={y1} x2={x2} y2={y2} stroke={drawing.color} strokeWidth={width} /><line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth="16" />{handle}</g>;
+    if (drawing.kind === 'hline') return <g key={drawing.id} onPointerDown={select} className={studiesLocked ? "locked-drawing" : "movable-drawing"} opacity={opacity}><line x1={x1} y1={y1} x2={x2} y2={y1} stroke={drawing.color} strokeWidth={width} /><line x1={x1} y1={y1} x2={x2} y2={y1} stroke="transparent" strokeWidth="16" />{handle}</g>;
+    if (drawing.kind === 'text') return <g key={drawing.id} onPointerDown={select} className={studiesLocked ? "locked-drawing" : "movable-drawing"} opacity={opacity}><text x={x1} y={y1} fill={drawing.color} fontSize={drawing.fontSize ?? 18} fontWeight="600">{drawing.text}</text><rect x={x1 - 6} y={y1 - (drawing.fontSize ?? 18)} width={textW} height={(drawing.fontSize ?? 18) + 10} fill="transparent" stroke={selected ? drawing.color : 'transparent'} strokeDasharray="4 3" />{handle}</g>;
+    if (drawing.kind === 'rect') return <g key={drawing.id} onPointerDown={select} className={studiesLocked ? "locked-drawing" : "movable-drawing"} opacity={opacity}><rect x={Math.min(x1, x2)} y={Math.min(y1, y2)} width={Math.abs(x2 - x1)} height={Math.abs(y2 - y1)} fill={drawing.color} fillOpacity=".13" stroke={drawing.color} strokeWidth={width} /><rect x={Math.min(x1, x2) - 5} y={Math.min(y1, y2) - 5} width={Math.abs(x2 - x1) + 10} height={Math.abs(y2 - y1) + 10} fill="transparent" stroke="transparent" strokeWidth="10" />{handle}</g>;
+    if (drawing.kind === 'trend') return <g key={drawing.id} onPointerDown={select} className={studiesLocked ? "locked-drawing" : "movable-drawing"} opacity={opacity}><line x1={x1} y1={y1} x2={x2} y2={y2} stroke={drawing.color} strokeWidth={width} /><line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth="16" />{handle}</g>;
     if (drawing.kind === 'fibext') {
       const third = drawing.third ?? drawing.end, x3 = chart.x(third.index), y3 = chart.y(third.price);
       const levels = [0, .618, 1, 1.618, 2.618], amplitude = drawing.end.price - drawing.start.price;
-      return <g key={drawing.id} onPointerDown={select} className="movable-drawing" opacity={opacity}><path d={`M ${x1} ${y1} L ${x2} ${y2} L ${x3} ${y3}`} fill="none" stroke={drawing.color} strokeWidth={Math.max(1, width * .7)} strokeDasharray="5 5" />{levels.map((level) => { const y = chart.y(third.price + amplitude * level); return <g key={level}><line x1={x3} y1={y} x2={chart.width - chart.padding.right} y2={y} stroke={drawing.color} strokeWidth={width} strokeDasharray={level === 0 || level === 1 ? undefined : '5 5'} /><text x={chart.width - chart.padding.right - 7} y={y - 5} textAnchor="end" fill={drawing.color} fontSize="12">{level}</text></g>; })}{selected && <><circle className="fib-point" cx={x1} cy={y1} r="4" /><circle className="fib-point" cx={x2} cy={y2} r="4" /><circle className="resize-handle" cx={x3} cy={y3} r="6" onPointerDown={resize} /></>}</g>;
+      return <g key={drawing.id} onPointerDown={select} className={studiesLocked ? "locked-drawing" : "movable-drawing"} opacity={opacity}><path d={`M ${x1} ${y1} L ${x2} ${y2} L ${x3} ${y3}`} fill="none" stroke={drawing.color} strokeWidth={Math.max(1, width * .7)} strokeDasharray="5 5" />{levels.map((level) => { const y = chart.y(third.price + amplitude * level); return <g key={level}><line x1={x3} y1={y} x2={chart.width - chart.padding.right} y2={y} stroke={drawing.color} strokeWidth={width} strokeDasharray={level === 0 || level === 1 ? undefined : '5 5'} /><text x={chart.width - chart.padding.right - 7} y={y - 5} textAnchor="end" fill={drawing.color} fontSize="12">{level}</text></g>; })}{selected && <><circle className="fib-point" cx={x1} cy={y1} r="4" /><circle className="fib-point" cx={x2} cy={y2} r="4" /><circle className="resize-handle" cx={x3} cy={y3} r="6" onPointerDown={resize} /></>}</g>;
     }
     const levels = [0, .236, .382, .5, .618, .786, .886, 1];
-    return <g key={drawing.id} onPointerDown={select} className="movable-drawing" opacity={opacity}>{levels.map((level) => {
+    return <g key={drawing.id} onPointerDown={select} className={studiesLocked ? "locked-drawing" : "movable-drawing"} opacity={opacity}>{levels.map((level) => {
       const y = y2 + (y1 - y2) * level;
       return <g key={level}><line x1={x1} y1={y} x2={x2} y2={y} stroke={drawing.color} strokeWidth={width} strokeDasharray={level === 0 || level === 1 ? undefined : '5 5'} /><text x={x2 + 7} y={y - 5} fill={drawing.color} fontSize="12">{level}</text></g>;
     })}<rect x={Math.min(x1, x2)} y={Math.min(y1, y2) - 8} width={Math.abs(x2 - x1)} height={Math.abs(y2 - y1) + 16} fill="transparent" stroke="transparent" strokeWidth="12" />{handle}</g>;
@@ -450,7 +477,7 @@ export default function Home() {
   return (
     <main className="app-shell" style={{ '--chart-bg': colors.background } as React.CSSProperties}>
       <header className="topbar">
-        <div className="brand"><span className="brand-mark"><BarChart3 size={18} /></span><span>Mercado</span></div>
+        <div className="brand"><span className="brand-mark"><BarChart3 size={18} /></span><span>GraphicView</span></div>
         <div className="asset-picker-wrap">
           <button className="asset-picker" onClick={() => setAssetMenu(!assetMenu)}><AssetIcon asset={asset} size="medium" /><span><strong>{symbol}</strong><small>{market.name || asset.name}</small></span><ChevronDown size={16} /></button>
           {assetMenu && <div className="asset-menu">
@@ -462,19 +489,21 @@ export default function Home() {
         <div className="top-actions">
           <button className="action-button" onClick={() => setIndicatorMenu(!indicatorMenu)}><LineChart size={17} /><span>Indicadores</span><b>{indicators.length}</b></button>
           <button className={`icon-button ${!showStudies ? 'active' : ''}`} onClick={() => setShowStudies(!showStudies)} aria-label="Mostrar u ocultar dibujos">{showStudies ? <Eye size={18} /> : <EyeOff size={18} />}</button>
+          <button className={`icon-button ${studiesLocked ? 'active' : ''}`} onClick={toggleStudiesLock} aria-label={studiesLocked ? 'Desbloquear dibujos e indicadores' : 'Bloquear dibujos e indicadores'} title={studiesLocked ? 'Desbloquear dibujos e indicadores' : 'Bloquear dibujos e indicadores'}>{studiesLocked ? <Lock size={18} /> : <Unlock size={18} />}</button>
           <button className="icon-button" onClick={() => setSettingsOpen(!settingsOpen)} aria-label="Apariencia"><Palette size={18} /></button>
         </div>
-        {indicatorMenu && <div className="floating-panel indicators-panel"><div className="panel-heading"><span>Indicadores</span></div>{INDICATORS.map((item) => <div className={`indicator-row ${selectedIndicator === item.id ? 'current' : ''}`} key={item.id}><button onClick={() => { setSelectedIndicator(item.id); if (!indicators.includes(item.id)) setIndicators((list) => [...list, item.id]); }}><span style={{ background: indicatorStyles[item.id]?.color ?? item.color }} />{item.label}</button><button className={indicators.includes(item.id) ? 'visible-toggle' : ''} onClick={() => setIndicators((list) => list.includes(item.id) ? list.filter((id) => id !== item.id) : [...list, item.id])} aria-label={`${indicators.includes(item.id) ? 'Ocultar' : 'Mostrar'} ${item.label}`}>{indicators.includes(item.id) ? <Eye size={15} /> : <EyeOff size={15} />}</button></div>)}{selectedIndicator && selectedIndicatorStyle && <div className="indicator-editor"><strong>{INDICATORS.find((item) => item.id === selectedIndicator)?.label}</strong><label>Color <input type="color" value={selectedIndicatorStyle.color} onChange={(event) => setIndicatorStyles((styles) => ({ ...styles, [selectedIndicator]: { ...styles[selectedIndicator], color: event.target.value } }))} /></label><label>Opacidad <input type="range" min="10" max="100" value={Math.round(selectedIndicatorStyle.opacity * 100)} onChange={(event) => setIndicatorStyles((styles) => ({ ...styles, [selectedIndicator]: { ...styles[selectedIndicator], opacity: Number(event.target.value) / 100 } }))} /><output>{Math.round(selectedIndicatorStyle.opacity * 100)}%</output></label><label>Grosor <input type="range" min="1" max="8" step=".5" value={selectedIndicatorStyle.width} onChange={(event) => setIndicatorStyles((styles) => ({ ...styles, [selectedIndicator]: { ...styles[selectedIndicator], width: Number(event.target.value) } }))} /><output>{selectedIndicatorStyle.width}px</output></label></div>}</div>}
+        {indicatorMenu && <div className="floating-panel indicators-panel"><div className="panel-heading"><span>Indicadores</span></div>{INDICATORS.map((item) => <div className={`indicator-row ${selectedIndicator === item.id ? 'current' : ''}`} key={item.id}><button disabled={studiesLocked} onClick={() => { setSelectedIndicator(item.id); if (!indicators.includes(item.id)) setIndicators((list) => [...list, item.id]); }}><span style={{ background: indicatorStyles[item.id]?.color ?? item.color }} />{item.label}</button><button disabled={studiesLocked} className={indicators.includes(item.id) ? 'visible-toggle' : ''} onClick={() => setIndicators((list) => list.includes(item.id) ? list.filter((id) => id !== item.id) : [...list, item.id])} aria-label={`${indicators.includes(item.id) ? 'Ocultar' : 'Mostrar'} ${item.label}`}>{indicators.includes(item.id) ? <Eye size={15} /> : <EyeOff size={15} />}</button></div>)}{!studiesLocked && selectedIndicator && selectedIndicatorStyle && <div className="indicator-editor"><strong>{INDICATORS.find((item) => item.id === selectedIndicator)?.label}</strong><label>Color <input type="color" value={selectedIndicatorStyle.color} onChange={(event) => setIndicatorStyles((styles) => ({ ...styles, [selectedIndicator]: { ...styles[selectedIndicator], color: event.target.value } }))} /></label><label>Opacidad <input type="range" min="10" max="100" value={Math.round(selectedIndicatorStyle.opacity * 100)} onChange={(event) => setIndicatorStyles((styles) => ({ ...styles, [selectedIndicator]: { ...styles[selectedIndicator], opacity: Number(event.target.value) / 100 } }))} /><output>{Math.round(selectedIndicatorStyle.opacity * 100)}%</output></label><label>Grosor <input type="range" min="1" max="8" step=".5" value={selectedIndicatorStyle.width} onChange={(event) => setIndicatorStyles((styles) => ({ ...styles, [selectedIndicator]: { ...styles[selectedIndicator], width: Number(event.target.value) } }))} /><output>{selectedIndicatorStyle.width}px</output></label></div>}</div>}
         {settingsOpen && <div className="floating-panel settings-panel"><div className="panel-heading"><span>Apariencia</span><small>Guardado local</small></div><label>Vela alcista<input type="color" value={colors.up} onChange={(event) => setColors({ ...colors, up: event.target.value })} /></label><label>Vela bajista<input type="color" value={colors.down} onChange={(event) => setColors({ ...colors, down: event.target.value })} /></label><label>Fondo del gráfico<input type="color" value={colors.background} onChange={(event) => setColors({ ...colors, background: event.target.value })} /></label></div>}
       </header>
 
       <section className={`workspace ${toolsOpen ? '' : 'tools-closed'} ${favoritesOpen ? '' : 'favorites-closed'}`}>
         <aside className="toolrail">
           <button className="rail-toggle" onClick={() => setToolsOpen(false)}><ChevronLeft size={17} /></button>
-          {TOOL_ITEMS.map(({ id, label, icon: Icon }) => <button key={id} className={activeTool === id ? 'active' : ''} onClick={() => { setActiveTool(id); setDraft(null); setFibExtStage(0); }} data-tooltip={label} aria-label={label}><Icon size={19} /></button>)}
+          {TOOL_ITEMS.map(({ id, label, icon: Icon }) => <button key={id} disabled={studiesLocked && id !== 'cursor' && id !== 'ruler'} className={activeTool === id ? 'active' : ''} onClick={() => { setActiveTool(id); setDraft(null); setFibExtStage(0); }} data-tooltip={label} aria-label={label}><Icon size={19} /></button>)}
           <span className="rail-divider" />
           <button onClick={() => setDrawings((all) => ({ ...all, [drawingKey]: currentDrawings.slice(0, -1) }))} disabled={!currentDrawings.length} data-tooltip="Deshacer dibujo"><Undo2 size={19} /></button>
           <button onClick={() => setShowStudies(!showStudies)} className={!showStudies ? 'active' : ''} data-tooltip="Mostrar u ocultar dibujos">{showStudies ? <Eye size={19} /> : <EyeOff size={19} />}</button>
+          <button onClick={toggleStudiesLock} className={studiesLocked ? 'active' : ''} data-tooltip={studiesLocked ? 'Desbloquear dibujos e indicadores' : 'Bloquear dibujos e indicadores'}>{studiesLocked ? <Lock size={19} /> : <Unlock size={19} />}</button>
         </aside>
         {!toolsOpen && <button className="open-tools edge-button" onClick={() => setToolsOpen(true)}><ChevronRight size={17} /></button>}
 
@@ -483,8 +512,8 @@ export default function Home() {
             <div><div className="chart-title"><AssetIcon asset={asset} size="medium" /><strong>{market.name || asset.name}</strong><em>· {timeframe}</em><span className="market-status"><i /> {market.exchange}</span></div><div className="ohlc"><span>O <b>{formatPrice(infoCandle.open, market.currency)}</b></span><span>C <b>{formatPrice(infoCandle.close, market.currency)}</b></span><span>H <b>{formatPrice(infoCandle.high, market.currency)}</b></span><span>L <b>{formatPrice(infoCandle.low, market.currency)}</b></span>{hoveredCandle ? <strong className="hovered-candle-date">{new Date(hoveredCandle.time).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</strong> : <strong className={market.change >= 0 ? 'positive' : 'negative'}>{market.change >= 0 ? '+' : ''}{market.change.toFixed(2)}%</strong>}</div></div>
             <div className="chart-controls"><span>Zoom</span><button onClick={() => setZoom((value) => Math.max(.5, Math.round((value - .05) * 100) / 100))}><Minus size={15} /></button><output>{Math.round(zoom * 100)}%</output><button onClick={() => setZoom((value) => Math.min(8, Math.round((value + .05) * 100) / 100))}><Plus size={15} /></button></div>
           </div>
-          <div className={`chart-canvas ${activeTool !== 'cursor' ? 'drawing' : 'pannable'}`} onWheel={(event) => { event.preventDefault(); if (Math.abs(event.deltaX) > Math.abs(event.deltaY) || event.shiftKey) setOffset((value) => Math.max(chart.minOffset, Math.min(chart.maxOffset, value + Math.round((event.deltaX || event.deltaY) / 8)))); else setZoom((value) => Math.min(8, Math.max(.5, Math.round((value + (event.deltaY < 0 ? .03 : -.03)) * 100) / 100))); }}>
-            <svg key={`${symbol}-${timeframe}-${market.key}`} viewBox="0 0 1200 660" role="img" aria-label={`Gráfico de velas de ${market.name}`} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerLeave={() => { panRef.current = null; scaleRef.current = null; dragRef.current = null; resizeRef.current = null; setCrosshair(null); }} onPointerCancel={() => { panRef.current = null; scaleRef.current = null; dragRef.current = null; resizeRef.current = null; setDraft(null); setCrosshair(null); }}>
+          <div className={`chart-canvas ${activeTool !== 'cursor' ? 'drawing' : 'pannable'} ${studiesLocked ? 'studies-locked' : ''}`} onWheel={(event) => { event.preventDefault(); if (Math.abs(event.deltaX) > Math.abs(event.deltaY) || event.shiftKey) setOffset((value) => Math.max(chart.minOffset, Math.min(chart.maxOffset, value + Math.round((event.deltaX || event.deltaY) / 8)))); else setZoom((value) => Math.min(8, Math.max(.5, Math.round((value + (event.deltaY < 0 ? .03 : -.03)) * 100) / 100))); }}>
+            <svg key={`${symbol}-${timeframe}-${market.key}`} viewBox="0 0 1200 660" preserveAspectRatio={isCompact ? 'none' : 'xMidYMid meet'} role="img" aria-label={`Gráfico de velas de ${market.name}`} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerLeave={() => { panRef.current = null; scaleRef.current = null; dragRef.current = null; resizeRef.current = null; setCrosshair(null); }} onPointerCancel={() => { panRef.current = null; scaleRef.current = null; dragRef.current = null; resizeRef.current = null; setDraft(null); setCrosshair(null); }}>
               <rect width="1200" height="660" fill={colors.background} />
               {[0, 1, 2, 3, 4, 5].map((index) => { const y = chart.padding.top + chart.innerH / 5 * index, value = chart.max - (chart.max - chart.min) / 5 * index; return <text key={index} x={1118} y={y + 4} className="axis-label">{formatPrice(value, market.currency).replace(/[A-Z$]/g, '')}</text>; })}
               {indicators.map((id) => { const item = INDICATORS.find((entry) => entry.id === id), style = indicatorStyles[id]; return item ? <path key={`${symbol}-${timeframe}-${id}-${chart.start}`} d={pathFor(item.id)} className="indicator-line" style={{ stroke: style?.color ?? item.color, strokeWidth: style?.width ?? 3, opacity: style?.opacity ?? .92 }} /> : null; })}
@@ -507,8 +536,8 @@ export default function Home() {
             {error && <div className="error-state">{error}</div>}
             {textPlacement && <div className="text-creator"><strong>Agregar texto</strong><input autoFocus value={newText} onChange={(event) => setNewText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addText(); if (event.key === 'Escape') setTextPlacement(null); }} placeholder="Escribe aquí…" /><div><button onClick={() => setTextPlacement(null)}>Cancelar</button><button onClick={addText} disabled={!newText.trim()}>Agregar</button></div></div>}
             {activeTool !== 'cursor' && <div className="drawing-tip"><Crosshair size={15} />{activeTool === 'hline' ? 'Haz clic para colocar la línea' : activeTool === 'text' ? 'Haz clic para agregar texto' : activeTool === 'fibext' ? (fibExtStage === 0 ? 'Primer clic: inicio del movimiento' : fibExtStage === 1 ? 'Segundo clic: final del movimiento' : 'Tercer clic: final del retroceso') : activeTool === 'ruler' ? (measurement ? 'Segundo clic para terminar la medición' : 'Primer clic para iniciar la medición') : 'Arrastra para dibujar'}</div>}
-            {!showStudies && <div className="studies-hidden"><EyeOff size={15} /> Dibujos ocultos</div>}
-            {selected && showStudies && <div className="drawing-editor"><strong>{selected.kind === 'text' ? 'Texto seleccionado' : 'Dibujo seleccionado'}</strong><label>Color <input type="color" value={selected.color} onChange={(event) => updateSelected({ color: event.target.value })} /></label><label>Opacidad <input className="style-range" type="range" min="10" max="100" value={Math.round((selected.opacity ?? 1) * 100)} onChange={(event) => updateSelected({ opacity: Number(event.target.value) / 100 })} /><output>{Math.round((selected.opacity ?? 1) * 100)}%</output></label>{selected.kind !== 'text' && <label>Grosor <input className="style-range" type="range" min="1" max="8" step=".5" value={selected.width ?? 2} onChange={(event) => updateSelected({ width: Number(event.target.value) })} /><output>{selected.width ?? 2}px</output></label>}{selected.kind === 'text' && <><label className="text-content-label">Texto <input className="text-content" value={selected.text ?? ''} onChange={(event) => updateSelected({ text: event.target.value })} /></label><label>Tamaño <input className="font-size" type="number" min="10" max="72" value={selected.fontSize ?? 18} onChange={(event) => updateSelected({ fontSize: Math.max(10, Math.min(72, Number(event.target.value))) })} /></label></>}<small>Arrastra para mover · usa el nodo derecho para redimensionar</small><button onClick={deleteSelected}><Trash2 size={15} /> Eliminar</button><button className="close-editor" onClick={() => setSelectedDrawing(null)}><X size={14} /></button></div>}
+            {!showStudies && <div className="studies-hidden"><EyeOff size={15} /> Dibujos ocultos</div>}{studiesLocked && <div className="studies-locked-note"><Lock size={15} /> Dibujos e indicadores bloqueados</div>}
+            {selected && showStudies && !studiesLocked && <div className="drawing-editor"><strong>{selected.kind === 'text' ? 'Texto seleccionado' : 'Dibujo seleccionado'}</strong><label>Color <input type="color" value={selected.color} onChange={(event) => updateSelected({ color: event.target.value })} /></label><label>Opacidad <input className="style-range" type="range" min="10" max="100" value={Math.round((selected.opacity ?? 1) * 100)} onChange={(event) => updateSelected({ opacity: Number(event.target.value) / 100 })} /><output>{Math.round((selected.opacity ?? 1) * 100)}%</output></label>{selected.kind !== 'text' && <label>Grosor <input className="style-range" type="range" min="1" max="8" step=".5" value={selected.width ?? 2} onChange={(event) => updateSelected({ width: Number(event.target.value) })} /><output>{selected.width ?? 2}px</output></label>}{selected.kind === 'text' && <><label className="text-content-label">Texto <input className="text-content" value={selected.text ?? ''} onChange={(event) => updateSelected({ text: event.target.value })} /></label><label>Tamaño <input className="font-size" type="number" min="10" max="72" value={selected.fontSize ?? 18} onChange={(event) => updateSelected({ fontSize: Math.max(10, Math.min(72, Number(event.target.value))) })} /></label></>}<small>Arrastra para mover · usa el nodo derecho para redimensionar</small><button onClick={deleteSelected}><Trash2 size={15} /> Eliminar</button><button className="close-editor" onClick={() => setSelectedDrawing(null)}><X size={14} /></button></div>}
           </div>
           <div className="history-nav"><button onClick={() => setOffset(chart.maxOffset)}>Inicio</button><input aria-label="Desplazarse por el historial" type="range" min="0" max={chart.maxOffset - chart.minOffset} value={chart.maxOffset - Math.max(chart.minOffset, Math.min(offset, chart.maxOffset))} onChange={(event) => setOffset(chart.maxOffset - Number(event.target.value))} /><button onClick={() => setOffset(0)}>Ahora</button></div>
         </section>
