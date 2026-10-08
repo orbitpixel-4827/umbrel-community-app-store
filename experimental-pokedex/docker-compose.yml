@@ -1,0 +1,35 @@
+version: "3.7"
+services:
+  app_proxy:
+    environment:
+      APP_HOST: experimental-pokedex_web_1
+      APP_PORT: 8765
+  web:
+    image: ghcr.io/orbitpixel-4827/pokedex:1.2.0@sha256:499b3b0b5bfb4912fc4b92138d39f94b575ef50243f2ad840abbfa41e65048c7
+    user: "1000:1000"
+    init: true
+    restart: on-failure
+    environment:
+      POKEDEX_BASE_URL: ""
+      POKEDEX_COOKIE_NAME: pokedex_umbrel_session
+      POKEDEX_PASSWORD: ${APP_PASSWORD}
+      POKEDEX_DATA_DIR: /data
+      POKEDEX_BIND: 0.0.0.0
+      POKEDEX_PORT: 8765
+      TZ: America/Mexico_City
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"
