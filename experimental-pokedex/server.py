@@ -314,7 +314,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             parsed=urllib.parse.urlparse(self.path);path=parsed.path;query=urllib.parse.parse_qs(parsed.query)
-            if path=='/health':return self.reply(200,{'ok':True,'version':'1.2.0'})
+            if path=='/health':return self.reply(200,{'ok':True,'version':'1.2.1'})
             if path.startswith('/api/'):
                 session,csrf=self.session()
                 if path=='/api/bootstrap':return self.reply(200,{'settings':self.app.store.settings(),'encounters':self.app.store.entries(),'csrf':csrf,'serverId':self.app.store.get('password_salt')})
