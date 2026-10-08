@@ -8,6 +8,8 @@ on:
       - "experimental-pokedex/core.py"
       - "experimental-pokedex/server.py"
       - "experimental-pokedex/manage.py"
+      - "experimental-pokedex/chatgpt.py"
+      - "experimental-pokedex/connect-chatgpt.mjs"
       - "experimental-pokedex/static/**"
       - "experimental-pokedex/tests/**"
       - ".github/workflows/pokedex-image.yml"
@@ -34,12 +36,16 @@ jobs:
           node-version: "22"
       - name: Server and data tests
         run: |
+          python -m pip install --no-cache-dir cryptography==50.0.2
           python -B tests/test_web.py
-          python -B -m unittest discover -s tests -p test_manage.py -v
+          python -B -m unittest discover -s tests -p 'test_manage.py' -v
+          python -B -m unittest discover -s tests -p 'test_chatgpt.py' -v
       - name: Browser logic tests
         run: node --test tests/*.test.mjs
       - name: Check browser script
-        run: node --check static/app.mjs
+        run: |
+          node --check static/app.mjs
+          node --check connect-chatgpt.mjs
   build:
     needs: verify
     runs-on: ubuntu-latest
@@ -59,13 +65,13 @@ jobs:
           context: ./experimental-pokedex
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/orbitpixel-4827/pokedex:1.2.1
+          tags: ghcr.io/orbitpixel-4827/pokedex:1.3.0
           labels: |
             org.opencontainers.image.title=Pokédex
             org.opencontainers.image.description=Pokédex personal para umbrelOS
             org.opencontainers.image.source=https://github.com/orbitpixel-4827/umbrel-community-app-store
-            org.opencontainers.image.version=1.2.1
+            org.opencontainers.image.version=1.3.0
       - name: Image reference
         env:
           DIGEST: ${{ steps.image.outputs.digest }}
-        run: echo "ghcr.io/orbitpixel-4827/pokedex:1.2.1@${DIGEST}" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "ghcr.io/orbitpixel-4827/pokedex:1.3.0@${DIGEST}" >> "$GITHUB_STEP_SUMMARY"
