@@ -1,1 +1,71 @@
-
+name: Build Pokédex image
+on:
+  push:
+    branches: [main]
+    paths:
+      - "experimental-pokedex/Dockerfile"
+      - "experimental-pokedex/.dockerignore"
+      - "experimental-pokedex/core.py"
+      - "experimental-pokedex/server.py"
+      - "experimental-pokedex/manage.py"
+      - "experimental-pokedex/static/**"
+      - "experimental-pokedex/tests/**"
+      - ".github/workflows/pokedex-image.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: pokedex-image
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experimental-pokedex
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Server and data tests
+        run: |
+          python -B tests/test_web.py
+          python -B -m unittest discover -s tests -p test_manage.py -v
+      - name: Browser logic tests
+        run: node --test tests/*.test.mjs
+      - name: Check browser script
+        run: node --check static/app.mjs
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish for Intel and ARM
+        id: image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./experimental-pokedex
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/orbitpixel-4827/pokedex:1.2.1
+          labels: |
+            org.opencontainers.image.title=Pokédex
+            org.opencontainers.image.description=Pokédex personal para umbrelOS
+            org.opencontainers.image.source=https://github.com/orbitpixel-4827/umbrel-community-app-store
+            org.opencontainers.image.version=1.2.1
+      - name: Image reference
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: echo "ghcr.io/orbitpixel-4827/pokedex:1.2.1@${DIGEST}" >> "$GITHUB_STEP_SUMMARY"
