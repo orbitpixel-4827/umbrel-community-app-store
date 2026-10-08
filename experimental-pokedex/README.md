@@ -1,4 +1,4 @@
-# Pokédex para Umbrel · 1.2.1
+# Pokédex para Umbrel · 1.3.0
 
 ![Pokédex roja](icon.png)
 
@@ -14,11 +14,37 @@ Si el navegador no permite la cámara en vivo, se ofrece tomar una foto o elegir
 
 En Safari puedes añadir Pokédex a la pantalla de inicio; conserva el mismo ícono rojo. La app activa una sesión de reproducción para voz y sonidos también desde ese acceso directo, y vuelve a activar el audio si iOS lo interrumpe al abrir la cámara. Probar voz muestra la preparación y reproducción o un error, además de guardar los ajustes. El comportamiento físico del iPhone debe verificarse en el dispositivo.
 
+## ChatGPT Plus para escanear
+
+En Ajustes → Reconocimiento elige **ChatGPT Plus · mi suscripción**. No se pide una clave de API de pago. La primera conexión requiere una computadora: OpenAI devuelve la autorización a `127.0.0.1`, no al servidor remoto ni al iPhone.
+
+En la computadora, desde este proyecto ubicado en el disco externo, ejecuta Node 22 o posterior con una salida privada dentro del mismo proyecto. En la instalación de desarrollo autorizada:
+
+```bash
+node connect-chatgpt.mjs --output "/Volumes/SSD/1 Proyectos/Apps con IA/Pokedex Umbrel/repository/experimental-pokedex/private/chatgpt-connection.json"
+```
+
+El asistente imprime una dirección para abrir en **el navegador interno de Codex**. No abre un navegador externo. Autoriza tu cuenta y el uso de tu plan. Después, en Pokédex abierta mediante HTTPS de confianza, pulsa **Importar conexión de la computadora** y selecciona el archivo indicado. Umbrel verifica la firma de los tokens, mantiene su propio identificador y renueva la conexión; los tokens nunca se incluyen en respuestas de ajustes, copias JSON de la colección ni imágenes públicas. Una copia SQLite completa sí contiene credenciales y debe mantenerse privada.
+
+El archivo de conexión contiene credenciales: no lo publiques ni lo envíes por chat. Después de importarlo, Umbrel debe encargarse de la renovación. Para desconectar, usa Ajustes; para revocar también el permiso en OpenAI, hazlo en los ajustes de ChatGPT. Pokédex distingue ambas acciones. Elige entre los modelos ofrecidos por tu cuenta uno que admita imágenes.
+
+El reconocimiento usa la suscripción de ChatGPT y sus límites de uso compartido. No se garantiza uso ilimitado ni disponibilidad para todas las cuentas. No hay cambio automático a una API de pago. La narración continúa usando Gemini; el acceso al plan de ChatGPT no sustituye esa voz.
+
+Flujo implementado según la [documentación oficial de SIWC](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [servidores remotos](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms) y [entrada de imágenes](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
+
+## Conexión y escaneo
+
+El reconocimiento y la obtención de la ficha se ejecutan como trabajos privados del servidor. Las consultas cortas de progreso evitan mantener una petición abierta a través del proxy de Umbrel durante todo el análisis. Consultar el resultado no reenvía la foto. Si se pierde una respuesta, la app permite recuperar el trabajo pendiente y no inicia otro escaneo encima. Los trabajos temporales caducan a los 10 minutos o al reiniciar el proceso; los encuentros guardados permanecen en SQLite.
+
+El inicio tiene un tiempo de espera definido y reintenta una consulta de conexión una vez. Nunca reintenta automáticamente el envío de una foto. Los errores de sesión del proxy, HTTPS/Tailscale, cuota del proveedor y renovación de ChatGPT se distinguen. Las fichas guardadas pueden verse sin conexión, pero su caché no autoriza operaciones nuevas con una sesión antigua.
+
+En Ajustes → Comprobar conexión puedes verificar la dirección, respuesta del servidor y disponibilidad de cámara sin gastar reconocimiento. Que la pantalla guardada abra no demuestra que el navegador pueda comunicarse con el servidor en ese momento.
+
 ## Datos y claves
 
 Los encuentros, ajustes, claves de reconocimiento/voz y caché viven en **la carpeta de datos de esta app en Umbrel**, bajo `data/`. Se conservan al reiniciar y actualizar; también admiten la gestión de almacenamiento de umbrelOS 2.0.
 
-Introduce las claves de Gemini/OpenRouter en Ajustes. No se incluyen claves, contraseñas del propietario ni bases personales en este repositorio o imagen. Las fotos del escaneo se envían al proveedor seleccionado para identificarlas; no se conserva la foto original en el historial. Las cuotas gratuitas del proveedor no son ilimitadas. La app aplica además 20 solicitudes de reconocimiento y 40 narraciones nuevas por día UTC, y un intervalo mínimo de 20 segundos entre reconocimientos. Una consulta de ficha o la reproducción de audio ya guardado no utiliza una nueva solicitud de IA. Los errores de cuota se muestran en pantalla; no activan servicios de pago.
+Introduce las claves de Gemini/OpenRouter en Ajustes. No se incluyen claves, contraseñas del propietario ni bases personales en este repositorio o imagen. Las fotos del escaneo se envían al proveedor seleccionado para identificarlas; no se conserva la foto original en el historial. Las cuotas gratuitas del proveedor no son ilimitadas. Pokédex no añade un tope diario de reconocimiento. Mantiene un intervalo mínimo de 20 segundos entre análisis por proveedor y 40 narraciones nuevas por día UTC. Las pausas tras un error de cuota son independientes para Gemini, OpenRouter y ChatGPT; la app respeta el tiempo de espera indicado por el servicio cuando está disponible. Los contadores antiguos de 20 análisis ya no bloquean al actualizar. En Ajustes → Reconocimiento → Comprobar acceso puedes ver las solicitudes gratuitas usadas, el límite diario y las restantes que OpenRouter informa para tu cuenta. Si el servicio no facilita el contador, se indica sin inventar una cifra. Gemini permite comprobar el acceso al modelo; su cuota se consulta en AI Studio. Una consulta de ficha o la reproducción de audio ya guardado no utiliza una nueva solicitud de IA. Los errores de cuota se muestran en pantalla; no activan servicios de pago.
 
 ## Trasladar los datos de Docker Compose
 
@@ -46,9 +72,9 @@ También puedes generar copias completas de esta versión con `python manage.py 
 
 ## Publicación y validación
 
-La imagen `ghcr.io/orbitpixel-4827/pokedex:1.2.1` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
+La imagen `ghcr.io/orbitpixel-4827/pokedex:1.3.0` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
 
-Pasaron 53 pruebas de servidor/datos, 28 de lógica JavaScript y 4 de migración completa. Se verificaron las cookies separadas, el origen HTTPS con las cabeceras del proxy y la conservación de encuentros, claves y contraseña en una copia de prueba. Las llamadas de los proveedores se simulan.
+Pasaron 65 pruebas de servidor y datos, 11 de autorización/renovación de ChatGPT y trabajos privados, 37 de lógica JavaScript y 4 de migración completa. En el navegador interno se probó la carga de dos imágenes consecutivas y se guardaron dos encuentros usando reconocimiento simulado. No se presentan esas respuestas simuladas como una prueba de precisión del modelo. La prueba real del plan de ChatGPT requiere que el propietario autorice su cuenta. Se verificaron las cookies separadas, el origen HTTPS con las cabeceras del proxy y la conservación de encuentros, claves y contraseña en una copia de prueba. Las llamadas de los proveedores se simulan.
 
 La instalación real mediante Umbrel, su certificado y la cámara del iPhone deben verificarse en los dispositivos del propietario; estas pruebas no se presentan como verificación en un Umbrel real.
 
