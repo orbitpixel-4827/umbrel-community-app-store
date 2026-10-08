@@ -1,4 +1,4 @@
-# Pokédex para Umbrel · 1.2.0
+# Pokédex para Umbrel · 1.2.1
 
 ![Pokédex roja](icon.png)
 
@@ -8,17 +8,17 @@ La contraseña inicial de esta instalación se muestra en Umbrel; puedes cambiar
 
 ## Cámara del iPhone
 
-Configura el certificado de Umbrel en el iPhone desde **Ajustes → Avanzados → Red → Acceso HTTPS → Cómo usar HTTPS → Ajustes avanzados de certificados → iOS**. Después abre la app con HTTPS y permite el acceso a la cámara. Al abrir el escáner se analiza una imagen a los 3,5 segundos, sin pulsar el disparador.
+Configura el certificado de Umbrel en el iPhone desde **Ajustes → Avanzados → Red → Acceso HTTPS → Cómo usar HTTPS → Ajustes avanzados de certificados → iOS**. Después abre la app con HTTPS y permite el acceso a la cámara. Al abrir el escáner se analiza una imagen a los 3,5 segundos, sin pulsar el disparador. Si todavía no han pasado los 20 segundos entre análisis, se indica la espera y se inicia automáticamente al terminar. Salir de la cámara cancela cualquier análisis programado.
 
 Si el navegador no permite la cámara en vivo, se ofrece tomar una foto o elegir una imagen. El certificado local de Umbrel no cubre las IP de Tailscale: para cámara en vivo fuera de casa hace falta una dirección HTTPS válida accesible por esa red privada.
 
-En Safari puedes añadir Pokédex a la pantalla de inicio; conserva el mismo ícono rojo.
+En Safari puedes añadir Pokédex a la pantalla de inicio; conserva el mismo ícono rojo. La app activa una sesión de reproducción para voz y sonidos también desde ese acceso directo, y vuelve a activar el audio si iOS lo interrumpe al abrir la cámara. Probar voz muestra la preparación y reproducción o un error, además de guardar los ajustes. El comportamiento físico del iPhone debe verificarse en el dispositivo.
 
 ## Datos y claves
 
 Los encuentros, ajustes, claves de reconocimiento/voz y caché viven en **la carpeta de datos de esta app en Umbrel**, bajo `data/`. Se conservan al reiniciar y actualizar; también admiten la gestión de almacenamiento de umbrelOS 2.0.
 
-Introduce las claves de Gemini/OpenRouter en Ajustes. No se incluyen claves, contraseñas del propietario ni bases personales en este repositorio o imagen. Las fotos del escaneo se envían al proveedor seleccionado para identificarlas; no se conserva la foto original en el historial. Las cuotas gratuitas del proveedor no son ilimitadas.
+Introduce las claves de Gemini/OpenRouter en Ajustes. No se incluyen claves, contraseñas del propietario ni bases personales en este repositorio o imagen. Las fotos del escaneo se envían al proveedor seleccionado para identificarlas; no se conserva la foto original en el historial. Las cuotas gratuitas del proveedor no son ilimitadas. La app aplica además 20 solicitudes de reconocimiento y 40 narraciones nuevas por día UTC, y un intervalo mínimo de 20 segundos entre reconocimientos. Una consulta de ficha o la reproducción de audio ya guardado no utiliza una nueva solicitud de IA. Los errores de cuota se muestran en pantalla; no activan servicios de pago.
 
 ## Trasladar los datos de Docker Compose
 
@@ -46,9 +46,9 @@ También puedes generar copias completas de esta versión con `python manage.py 
 
 ## Publicación y validación
 
-La imagen `ghcr.io/orbitpixel-4827/pokedex:1.2.0` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
+La imagen `ghcr.io/orbitpixel-4827/pokedex:1.2.1` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
 
-Pasaron 53 pruebas de servidor/datos, 16 de lógica JavaScript y 4 de migración completa. Se verificaron las cookies separadas, el origen HTTPS con las cabeceras del proxy y la conservación de encuentros, claves y contraseña en una copia de prueba. Las llamadas de los proveedores se simulan.
+Pasaron 53 pruebas de servidor/datos, 28 de lógica JavaScript y 4 de migración completa. Se verificaron las cookies separadas, el origen HTTPS con las cabeceras del proxy y la conservación de encuentros, claves y contraseña en una copia de prueba. Las llamadas de los proveedores se simulan.
 
 La instalación real mediante Umbrel, su certificado y la cámara del iPhone deben verificarse en los dispositivos del propietario; estas pruebas no se presentan como verificación en un Umbrel real.
 

@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: ai
 name: Pokédex
-version: "1.2.0"
+version: "1.2.1"
 tagline: Escanea, descubre y consulta tus Pokémon
 icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-pokedex/icon.png
 requiresHttps: true
@@ -23,7 +23,12 @@ description: >-
   Si vienes de la instalación con Docker Compose, importa tus encuentros desde la
   copia JSON de la app anterior. Las claves y la contraseña no se incluyen en esa
   copia; la guía del paquete explica cómo trasladar también la base completa.
-releaseNotes: ""
+releaseNotes: >-
+  Corrige el segundo escaneo: al abrir de nuevo la cámara durante la espera de
+  20 segundos, el análisis se inicia automáticamente al terminar. Mejora la
+  activación y recuperación de la voz y sonidos desde el acceso directo del
+  iPhone. Probar voz muestra preparación, reproducción o un error de audio.
+  Se mantienen los registros, claves y cuotas de uso.
 developer: Experimental Labs
 website: https://github.com/orbitpixel-4827/umbrel-community-app-store
 dependencies: []
@@ -36,4 +41,4 @@ defaultUsername: ""
 defaultPassword: ""
 deterministicPassword: true
 submitter: Experimental Labs
-submission: https://github.com/orbitpixel-4827/umbrel-community-app-store/pull/1
+submission: https://github.com/orbitpixel-4827/umbrel-community-app-store/pull/2
