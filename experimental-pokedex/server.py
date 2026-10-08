@@ -1,4 +1,4 @@
-"""Self-hosted Pokédex. No third-party packages; private data lives in DATA_DIR."""
+"""Self-hosted Pokédex. Private data and ChatGPT credentials live in DATA_DIR."""
 import base64
 import datetime
 import hashlib
@@ -18,6 +18,7 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import core
+import chatgpt
 
 ROOT=Path(__file__).resolve().parent
 SESSION_COOKIE=os.environ.get('POKEDEX_COOKIE_NAME','pokedex_session')
@@ -76,18 +77,21 @@ class Store:
     def settings(self):
         out=dict(DEFAULTS,**self.get('preferences',{}))
         out.update(hasGemini=bool(self.get('gemini_key')),hasOpenrouter=bool(self.get('openrouter_key')),hasVoice=bool(self.get('voice_key') or self.get('gemini_key')))
+        connection=self.get('chatgpt_connection') or {}
+        out['chatgpt']={'connected':bool(connection.get('refresh_token')),'email':connection.get('email',''),'model':connection.get('model','')}
+        out['chatgptModels']=self.get('chatgpt_models',[])
         return out
     def reserve(self,kind,limit,gap):
         now=time.time();day=datetime.datetime.now(datetime.timezone.utc).date().isoformat()
         with self.lock:
             row=self.db.execute('SELECT day,count,last,pause FROM quotas WHERE kind=?',(kind,)).fetchone()
             count=row[1] if row and row[0]==day else 0
-            if row and now<row[3]: raise core.Problem(429,f'Cuota del servicio agotada. Espera {int(row[3]-now)+1} segundos.')
-            if count>=limit: raise core.Problem(429,f'Llegaste al límite de {limit} solicitudes de {"voz" if kind=="voice" else "reconocimiento"} por hoy.')
+            if row and now<row[3]: raise core.Problem(429,f'{dict(chatgpt="ChatGPT",openrouter="OpenRouter").get(kind.removeprefix("vision:"),"Gemini")} está en pausa tras limitar las solicitudes. Espera {int(row[3]-now)+1} segundos antes de volver a probar.')
+            if limit is not None and count>=limit: raise core.Problem(429,f'Pokédex alcanzó su límite local de {limit} solicitudes de {"voz" if kind=="voice" else "reconocimiento"} por hoy.')
             if row and now-row[2]<gap: raise core.Problem(429,f'Espera {int(gap-(now-row[2]))+1} segundos antes de repetir.')
             self.db.execute('INSERT OR REPLACE INTO quotas VALUES (?,?,?,?,?)',(kind,day,count+1,now,row[3] if row else 0))
-    def pause(self,kind):
-        with self.lock: self.db.execute('UPDATE quotas SET pause=? WHERE kind=?',(time.time()+60,kind))
+    def pause(self,kind,seconds=60):
+        with self.lock: self.db.execute('UPDATE quotas SET pause=? WHERE kind=?',(time.time()+seconds,kind))
     def session(self,token):
         with self.lock:
             row=self.db.execute('SELECT csrf,expires FROM sessions WHERE token=?',(hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
@@ -148,7 +152,37 @@ class Store:
 
 class App:
     def __init__(self,store):
-        self.store=store;self.data=core.Data(store);self.login_attempts={};self.login_lock=threading.Lock()
+        self.store=store;self.data=core.Data(store);self.chatgpt=chatgpt.Connection(store);self.login_attempts={};self.login_lock=threading.Lock();self.jobs={};self.jobs_lock=threading.Lock()
+    def start_job(self,body,session):
+        operation=body.get('operation');data=body.get('input')
+        if operation not in ('recognize','encounters') or not isinstance(data,dict):raise core.Problem(400,'Operación de escaneo inválida.')
+        identity=body.get('id') or str(uuid.uuid4())
+        try:uuid.UUID(identity)
+        except (ValueError,TypeError,AttributeError):raise core.Problem(400,'Identificador de análisis inválido.') from None
+        fingerprint=hashlib.sha256(dumps({'operation':operation,'input':data}).encode()).hexdigest()
+        now=time.time()
+        with self.jobs_lock:
+            self.jobs={k:v for k,v in self.jobs.items() if now-v['at']<600}
+            old=self.jobs.get(identity)
+            if old:
+                if old['session']!=session or old['fingerprint']!=fingerprint:raise core.Problem(409,'El identificador pertenece a otro análisis.')
+                return {'job':identity}
+            pending=[j for j in self.jobs.values() if j['state']=='working']
+            if any(j['session']==session for j in pending):raise core.Problem(409,'Ya hay un análisis en curso. Espera a que termine.')
+            if len(pending)>=8:raise core.Problem(503,'Pokédex está ocupada. Espera un momento.')
+            job={'state':'working','session':session,'at':now,'fingerprint':fingerprint};self.jobs[identity]=job
+        def worker():
+            try:result=self.post('/api/'+operation,data,session);out={'state':'done','result':result}
+            except core.Problem as exc:out={'state':'failed','error':exc.message,'status':exc.status}
+            except Exception:out={'state':'failed','error':'No se completó la operación. Comprueba el historial antes de repetir.','status':500}
+            with self.jobs_lock:job.update(out)
+        threading.Thread(target=worker,daemon=True).start()
+        return {'job':identity}
+    def job(self,identity,session):
+        with self.jobs_lock:
+            job=self.jobs.get(identity)
+            if not job or job['session']!=session or time.time()-job['at']>=600:raise core.Problem(404,'El análisis ya no está disponible. Comprueba el historial antes de repetir.')
+            return {k:v for k,v in job.items() if k not in ('session','at','fingerprint')}
     def login(self,ip,password,verify_only=False):
         if not isinstance(password,str) or len(password)>512: raise core.Problem(400,'Contraseña inválida.')
         with self.login_lock:
@@ -163,13 +197,23 @@ class App:
         dex=self.data.dex(body.get('lookup',''),expected)
         return core.apply_form(dex,body.get('transformation','none'),body.get('teraType',''))
     def post(self,path,body,session):
+        if path=='/api/scan-jobs':return self.start_job(body,session)
+        if path=='/api/chatgpt/import':
+            self.chatgpt.import_credentials(body);self.store.set('preferences',dict(self.store.get('preferences',{}),provider='chatgpt'));return self.store.settings()
+        if path=='/api/chatgpt/models':
+            self.chatgpt.models();return self.store.settings()
+        if path=='/api/chatgpt/disconnect':
+            # Disconnect locally; users revoke remote permission in ChatGPT settings.
+            with self.chatgpt.lock:
+                self.store.set('chatgpt_connection',None);self.store.set('chatgpt_models',[])
+            return self.store.settings()
         if path=='/api/settings':
             old=self.store.get('preferences',{});out=dict(DEFAULTS,**old)
             for k in ('autoVoice','robot'):
                 if k in body:
                     if not isinstance(body[k],bool): raise core.Problem(400,'Preferencia inválida.')
                     out[k]=body[k]
-            for k,allowed in (('provider',('gemini','openrouter')),('voice',('Charon','Kore','Puck')),('game',core.CATALOG['games'])):
+            for k,allowed in (('provider',('chatgpt','gemini','openrouter')),('voice',('Charon','Kore','Puck')),('game',core.CATALOG['games'])):
                 if k in body:
                     if body[k] not in allowed: raise core.Problem(400,'Opción inválida.')
                     out[k]=body[k]
@@ -185,6 +229,7 @@ class App:
                     if not isinstance(value,str) or not 10<=len(value.strip())<=2048 or any(c.isspace() for c in value.strip()): raise core.Problem(400,'La clave está incompleta o contiene espacios.')
                     keys[k]=value.strip()
             for k,v in keys.items(): self.store.set(k,v)
+            if 'chatgptModel' in body:self.chatgpt.select_model(body['chatgptModel'])
             self.store.set('preferences',out);return self.store.settings()
         if path=='/api/password':
             self.login('password-change:'+session,body.get('current',''),verify_only=True)
@@ -200,6 +245,13 @@ class App:
             with self.store.lock: self.store.db.execute('DELETE FROM sessions WHERE token=?',(hashlib.sha256(session.encode()).hexdigest(),))
             return {'ok':True}
         if path=='/api/import': return {'inserted':self.store.import_backup(body)}
+        if path=='/api/check-recognition':
+            provider=self.store.settings()['provider'];key=self.store.get(provider+'_key')
+            if provider=='chatgpt':
+                models=self.chatgpt.models()
+                return {'provider':'chatgpt','daily':None,'models':models,'message':'Conectado a tu plan de ChatGPT. No se envió una imagen ni se consumió un reconocimiento. Se aplican los límites de uso compartido de tu suscripción.'}
+            if provider!='chatgpt' and not key: raise core.Problem(400,'Configura la clave de reconocimiento en Ajustes.')
+            return core.recognition_access(provider,key)
         if path=='/api/recognize':
             image=body.get('image','')
             if not isinstance(image,str) or len(image)>2*1024*1024: raise core.Problem(413,'La imagen es demasiado grande.')
@@ -207,11 +259,14 @@ class App:
             except ValueError: raise core.Problem(400,'Imagen inválida.') from None
             if not raw.startswith(b'\xff\xd8\xff') or len(raw)<100: raise core.Problem(400,'Selecciona una imagen JPEG válida.')
             provider=self.store.settings()['provider'];key=self.store.get(provider+'_key')
-            if not key: raise core.Problem(400,'Configura la clave de reconocimiento en Ajustes.')
-            self.store.reserve('vision',20,20)
-            try: result=core.recognize(image,provider,key)
+            if provider!='chatgpt' and not key: raise core.Problem(400,'Configura la clave de reconocimiento en Ajustes.')
+            # A provider's quota or cooldown must not block the other provider.
+            # Ignore the old shared daily cap without deleting saved user data.
+            scope='vision:'+provider
+            self.store.reserve(scope,None,20)
+            try: result=self.chatgpt.recognize(image) if provider=='chatgpt' else core.recognize(image,provider,key)
             except core.Problem as e:
-                if e.status==429:self.store.pause('vision')
+                if e.status==429:self.store.pause(scope,e.retry_after or 60)
                 raise
             ticket=secrets.token_urlsafe(24)
             with self.store.lock:
@@ -264,7 +319,7 @@ class App:
             self.store.reserve('voice',40,5)
             try: raw=core.voice_response(core.fetch_json('https://generativelanguage.googleapis.com/v1beta/interactions',core.voice_payload(text,voice),{'x-goog-api-key':key}))
             except core.Problem as e:
-                if e.status==429:self.store.pause('voice')
+                if e.status==429:self.store.pause('voice',e.retry_after or 60)
                 raise
             self.store.save_blob(cache_key,raw,'audio/wav');return raw,'audio/wav'
         raise core.Problem(404,'La opción no existe.')
@@ -314,9 +369,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             parsed=urllib.parse.urlparse(self.path);path=parsed.path;query=urllib.parse.parse_qs(parsed.query)
-            if path=='/health':return self.reply(200,{'ok':True,'version':'1.2.1'})
+            if path=='/health':return self.reply(200,{'ok':True,'version':'1.3.0'})
             if path.startswith('/api/'):
                 session,csrf=self.session()
+                if path.startswith('/api/scan-jobs/'):
+                    return self.reply(200,self.app.job(path.rsplit('/',1)[1],session))
                 if path=='/api/bootstrap':return self.reply(200,{'settings':self.app.store.settings(),'encounters':self.app.store.entries(),'csrf':csrf,'serverId':self.app.store.get('password_salt')})
                 if path=='/api/export':return self.reply(200,{'format':'pokedex-roja','version':1,'exportedAt':int(time.time()*1000),'encounters':self.app.store.entries()})
                 if path=='/api/dex':return self.reply(200,self.app.data.dex(query.get('q',[''])[0]))
@@ -356,6 +413,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'csrf':csrf},'application/json',{'Set-Cookie':SESSION_COOKIE+'='+token+'; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000'+('; Secure' if secure else '')})
             session,csrf=self.session()
             if not hmac.compare_digest(self.headers.get('X-Pokedex-CSRF',''),csrf):raise core.Problem(403,'La sesión cambió. Vuelve a abrir Pokédex.')
+            if path=='/api/chatgpt/import' and scheme!='https':raise core.Problem(400,'La conexión de ChatGPT solo se importa por HTTPS con un certificado de confianza.')
             result=self.app.post(path,body,session)
             if isinstance(result,tuple):return self.reply(200,result[0],result[1])
             return self.reply(200,result,headers={'Set-Cookie':SESSION_COOKIE+'=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'} if path=='/api/logout' else None)
