@@ -1,0 +1,7 @@
+*
+!Dockerfile
+!core.py
+!server.py
+!static/
+!static/**
+!manage.py
