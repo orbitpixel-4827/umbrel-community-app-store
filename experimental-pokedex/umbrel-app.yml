@@ -1,0 +1,39 @@
+manifestVersion: 2.0
+id: experimental-pokedex
+storage:
+  dataRoot: data
+category: ai
+name: Pokédex
+version: "1.2.0"
+tagline: Escanea, descubre y consulta tus Pokémon
+icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-pokedex/icon.png
+requiresHttps: true
+description: >-
+  Tu Pokédex personal con el diseño rojo de Ash. Abre la cámara, apunta a un Pokémon
+  y escucha su descripción con voz metálica. Consulta imágenes, formas, evoluciones,
+  estadísticas, defensas y movimientos por videojuego.
+
+
+  Requiere umbrelOS 2.0 y HTTPS de Umbrel con su certificado configurado en el teléfono
+  para usar la cámara en vivo. En Ajustes, introduce una clave propia de Gemini
+  u OpenRouter para reconocimiento y una de Gemini para voz; las cuotas gratuitas
+  dependen del proveedor. El historial, preferencias y claves permanecen en tu Umbrel.
+
+
+  Si vienes de la instalación con Docker Compose, importa tus encuentros desde la
+  copia JSON de la app anterior. Las claves y la contraseña no se incluyen en esa
+  copia; la guía del paquete explica cómo trasladar también la base completa.
+releaseNotes: ""
+developer: Experimental Labs
+website: https://github.com/orbitpixel-4827/umbrel-community-app-store
+dependencies: []
+repo: https://github.com/orbitpixel-4827/umbrel-community-app-store/tree/main/experimental-pokedex
+support: https://github.com/orbitpixel-4827/umbrel-community-app-store/issues
+port: 9088
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+deterministicPassword: true
+submitter: Experimental Labs
+submission: https://github.com/orbitpixel-4827/umbrel-community-app-store/pull/1
