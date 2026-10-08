@@ -7,7 +7,7 @@ services:
       APP_PORT: 3000
 
   web:
-    image: ghcr.io/orbitpixel-4827/graphicview:1.0.2
+    image: ghcr.io/orbitpixel-4827/graphicview:1.1.1
     user: "1000:1000"
     init: true
     restart: on-failure

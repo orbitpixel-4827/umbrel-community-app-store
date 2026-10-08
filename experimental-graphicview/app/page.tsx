@@ -261,8 +261,11 @@ export default function Home() {
   }, [search]);
 
   const chart = useMemo(() => {
-    const width = 1200, height = 660, padding = { left: 20, right: 88, top: 42, bottom: 64 };
-    const visibleCount = Math.min(candles.length, Math.max(22, Math.round(150 / zoom)));
+    const width = isCompact ? 430 : 1200;
+    const height = isCompact ? 720 : 660;
+    const padding = isCompact ? { left: 12, right: 72, top: 28, bottom: 58 } : { left: 20, right: 88, top: 42, bottom: 64 };
+    const baseVisibleCount = isCompact ? 54 : 150;
+    const visibleCount = Math.min(candles.length, Math.max(isCompact ? 16 : 22, Math.round(baseVisibleCount / zoom)));
     const maxOffset = Math.max(0, candles.length - visibleCount);
     const minOffset = -Math.max(12, Math.round(visibleCount * .28));
     const safeOffset = Math.max(minOffset, Math.min(offset, maxOffset));
@@ -284,17 +287,17 @@ export default function Home() {
     const y = (value: number) => padding.top + ((max - value) / (max - min)) * innerH;
     const fromScreen = (point: Point) => ({ index: Math.max(0, Math.min(Math.max(candles.length - 1, Math.ceil(end) - 1), Math.round(start + (point.x - padding.left) / barW))), price: max - ((point.y - padding.top) / innerH) * (max - min) });
     return { width, height, padding, visible, visibleCount, maxOffset, minOffset, start, end, dataStart, dataEnd, min, max, innerW, innerH, barW, x, y, fromScreen };
-  }, [averages, candles, indicators, offset, verticalScale, zoom]);
+  }, [averages, candles, indicators, isCompact, offset, verticalScale, zoom]);
 
   function screenPoint(event: PointerEvent<SVGSVGElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
-    return { x: (event.clientX - rect.left) / rect.width * 1200, y: (event.clientY - rect.top) / rect.height * 660 };
+    return { x: (event.clientX - rect.left) / rect.width * chart.width, y: (event.clientY - rect.top) / rect.height * chart.height };
   }
 
   function pointFromClient(clientX: number, clientY: number, element: SVGElement) {
     const svg = element.closest('svg')!;
     const rect = svg.getBoundingClientRect();
-    return { x: (clientX - rect.left) / rect.width * 1200, y: (clientY - rect.top) / rect.height * 660 };
+    return { x: (clientX - rect.left) / rect.width * chart.width, y: (clientY - rect.top) / rect.height * chart.height };
   }
 
   function pointerDown(event: PointerEvent<SVGSVGElement>) {
@@ -343,13 +346,13 @@ export default function Home() {
       const next = scaleRef.current.scale * Math.exp((scaleRef.current.y - event.clientY) / 180);
       setVerticalScale(Math.max(.25, Math.min(6, next)));
     } else if (panRef.current) {
-      const bars = Math.round((event.clientX - panRef.current.x) / Math.max(3, chart.barW * event.currentTarget.getBoundingClientRect().width / 1200));
+      const bars = Math.round((event.clientX - panRef.current.x) / Math.max(3, chart.barW * event.currentTarget.getBoundingClientRect().width / chart.width));
       setOffset(Math.max(chart.minOffset, Math.min(chart.maxOffset, panRef.current.offset + bars)));
     } else if (resizeRef.current) {
       const resize = resizeRef.current;
       if (resize.kind === 'text') {
         const rect = event.currentTarget.getBoundingClientRect();
-        const delta = (event.clientX - resize.startClientX) * 1200 / rect.width;
+        const delta = (event.clientX - resize.startClientX) * chart.width / rect.width;
         setDrawings((all) => ({ ...all, [drawingKey]: (all[drawingKey] ?? []).map((drawing) => drawing.id === resize.id ? { ...drawing, fontSize: Math.max(10, Math.min(72, Math.round(resize.initialFontSize + delta / 5))) } : drawing) }));
       } else {
         const end = chart.fromScreen(point);
@@ -501,7 +504,7 @@ export default function Home() {
           <button className="rail-toggle" onClick={() => setToolsOpen(false)}><ChevronLeft size={17} /></button>
           {TOOL_ITEMS.map(({ id, label, icon: Icon }) => <button key={id} disabled={studiesLocked && id !== 'cursor' && id !== 'ruler'} className={activeTool === id ? 'active' : ''} onClick={() => { setActiveTool(id); setDraft(null); setFibExtStage(0); }} data-tooltip={label} aria-label={label}><Icon size={19} /></button>)}
           <span className="rail-divider" />
-          <button onClick={() => setDrawings((all) => ({ ...all, [drawingKey]: currentDrawings.slice(0, -1) }))} disabled={!currentDrawings.length} data-tooltip="Deshacer dibujo"><Undo2 size={19} /></button>
+          <button onClick={() => setDrawings((all) => ({ ...all, [drawingKey]: currentDrawings.slice(0, -1) }))} disabled={studiesLocked || !currentDrawings.length} data-tooltip="Deshacer dibujo"><Undo2 size={19} /></button>
           <button onClick={() => setShowStudies(!showStudies)} className={!showStudies ? 'active' : ''} data-tooltip="Mostrar u ocultar dibujos">{showStudies ? <Eye size={19} /> : <EyeOff size={19} />}</button>
           <button onClick={toggleStudiesLock} className={studiesLocked ? 'active' : ''} data-tooltip={studiesLocked ? 'Desbloquear dibujos e indicadores' : 'Bloquear dibujos e indicadores'}>{studiesLocked ? <Lock size={19} /> : <Unlock size={19} />}</button>
         </aside>
@@ -513,9 +516,9 @@ export default function Home() {
             <div className="chart-controls"><span>Zoom</span><button onClick={() => setZoom((value) => Math.max(.5, Math.round((value - .05) * 100) / 100))}><Minus size={15} /></button><output>{Math.round(zoom * 100)}%</output><button onClick={() => setZoom((value) => Math.min(8, Math.round((value + .05) * 100) / 100))}><Plus size={15} /></button></div>
           </div>
           <div className={`chart-canvas ${activeTool !== 'cursor' ? 'drawing' : 'pannable'} ${studiesLocked ? 'studies-locked' : ''}`} onWheel={(event) => { event.preventDefault(); if (Math.abs(event.deltaX) > Math.abs(event.deltaY) || event.shiftKey) setOffset((value) => Math.max(chart.minOffset, Math.min(chart.maxOffset, value + Math.round((event.deltaX || event.deltaY) / 8)))); else setZoom((value) => Math.min(8, Math.max(.5, Math.round((value + (event.deltaY < 0 ? .03 : -.03)) * 100) / 100))); }}>
-            <svg key={`${symbol}-${timeframe}-${market.key}`} viewBox="0 0 1200 660" preserveAspectRatio={isCompact ? 'none' : 'xMidYMid meet'} role="img" aria-label={`Gráfico de velas de ${market.name}`} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerLeave={() => { panRef.current = null; scaleRef.current = null; dragRef.current = null; resizeRef.current = null; setCrosshair(null); }} onPointerCancel={() => { panRef.current = null; scaleRef.current = null; dragRef.current = null; resizeRef.current = null; setDraft(null); setCrosshair(null); }}>
-              <rect width="1200" height="660" fill={colors.background} />
-              {[0, 1, 2, 3, 4, 5].map((index) => { const y = chart.padding.top + chart.innerH / 5 * index, value = chart.max - (chart.max - chart.min) / 5 * index; return <text key={index} x={1118} y={y + 4} className="axis-label">{formatPrice(value, market.currency).replace(/[A-Z$]/g, '')}</text>; })}
+            <svg key={`${symbol}-${timeframe}-${market.key}`} viewBox={`0 0 ${chart.width} ${chart.height}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={`Gráfico de velas de ${market.name}`} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerLeave={() => { panRef.current = null; scaleRef.current = null; dragRef.current = null; resizeRef.current = null; setCrosshair(null); }} onPointerCancel={() => { panRef.current = null; scaleRef.current = null; dragRef.current = null; resizeRef.current = null; setDraft(null); setCrosshair(null); }}>
+              <rect width={chart.width} height={chart.height} fill={colors.background} />
+              {[0, 1, 2, 3, 4, 5].map((index) => { const y = chart.padding.top + chart.innerH / 5 * index, value = chart.max - (chart.max - chart.min) / 5 * index; return <text key={index} x={chart.width - chart.padding.right + 6} y={y + 4} className="axis-label">{formatPrice(value, market.currency).replace(/[A-Z$]/g, '')}</text>; })}
               {indicators.map((id) => { const item = INDICATORS.find((entry) => entry.id === id), style = indicatorStyles[id]; return item ? <path key={`${symbol}-${timeframe}-${id}-${chart.start}`} d={pathFor(item.id)} className="indicator-line" style={{ stroke: style?.color ?? item.color, strokeWidth: style?.width ?? 3, opacity: style?.opacity ?? .92 }} /> : null; })}
               {chart.visible.map((candle, i) => { const index = chart.dataStart + i, w = Math.max(2, chart.barW * .62), rising = candle.close >= candle.open, color = rising ? colors.up : colors.down; return <g key={candle.time}><line x1={chart.x(index)} x2={chart.x(index)} y1={chart.y(candle.high)} y2={chart.y(candle.low)} stroke={color} strokeWidth="1.4" /><rect x={chart.x(index) - w / 2} y={Math.min(chart.y(candle.open), chart.y(candle.close))} width={w} height={Math.max(2, Math.abs(chart.y(candle.open) - chart.y(candle.close)))} fill={color} stroke={color} strokeWidth="1.2" /></g>; })}
               {showStudies && currentDrawings.map(drawingElement)}{showStudies && draft && drawingElement(draft)}
@@ -523,13 +526,13 @@ export default function Home() {
                 <line x1={chart.x(measurement.start.index)} y1={chart.y(measurement.start.price)} x2={chart.x(measurement.end.index)} y2={chart.y(measurement.end.price)} />
                 <circle cx={chart.x(measurement.start.index)} cy={chart.y(measurement.start.price)} r="4" />
                 <circle cx={chart.x(measurement.end.index)} cy={chart.y(measurement.end.price)} r="4" />
-                {measurementStats && <g transform={`translate(${Math.max(26, Math.min(890, (chart.x(measurement.start.index) + chart.x(measurement.end.index)) / 2 - 115))},${Math.max(50, Math.min(575, (chart.y(measurement.start.price) + chart.y(measurement.end.price)) / 2 - 42))})`}>
+                {measurementStats && <g transform={`translate(${Math.max(26, Math.min(chart.width - 250, (chart.x(measurement.start.index) + chart.x(measurement.end.index)) / 2 - 115))},${Math.max(50, Math.min(chart.height - 85, (chart.y(measurement.start.price) + chart.y(measurement.end.price)) / 2 - 42))})`}>
                   <rect width="230" height="70" rx="7" /><text x="12" y="20">{measurementStats.candles} velas</text><text x="12" y="40">{measurementStats.percent >= 0 ? '+' : ''}{measurementStats.percent.toFixed(2)}%</text><text x="12" y="59">{measurementStats.price >= 0 ? '+' : ''}{formatPrice(measurementStats.price, market.currency)}</text>
                 </g>}
               </g>}
-              {crosshair && <g className="crosshair-layer" pointerEvents="none"><line x1={crosshair.x} x2={crosshair.x} y1={chart.padding.top} y2={chart.height - chart.padding.bottom} /><line x1={chart.padding.left} x2={chart.width - chart.padding.right} y1={crosshair.y} y2={crosshair.y} /><g transform={`translate(${Math.max(24, Math.min(1010, crosshair.x - 65))},${chart.height - chart.padding.bottom + 8})`}><rect width="130" height="27" rx="4" /><text x="65" y="18" textAnchor="middle">{crossDate}</text></g><g transform={`translate(${chart.width - chart.padding.right},${Math.max(chart.padding.top, Math.min(chart.height - chart.padding.bottom - 27, crosshair.y - 13))})`}><rect width="88" height="27" rx="4" /><text x="44" y="18" textAnchor="middle">{formatPrice(crossPrice, market.currency).replace(/[A-Z$]/g, '')}</text></g></g>}
-              {market.price > 0 && <><line x1="20" x2="1112" y1={chart.y(market.price)} y2={chart.y(market.price)} className="price-line" /><g transform={`translate(1112,${chart.y(market.price) - 15})`}><rect width="88" height="30" rx="5" fill="#31c7d0" /><text x="7" y="20" fill="#031014" fontSize="13" fontWeight="700">{formatPrice(market.price, market.currency).replace(/[A-Z$]/g, '')}</text></g></>}
-              {[0, .33, .66, 1].map((part) => { const index = chart.start + Math.round((chart.visibleCount - 1) * part), date = new Date(timeAtIndex(index)); return <text key={part} x={chart.x(index)} y="642" textAnchor={part === 0 ? 'start' : part === 1 ? 'end' : 'middle'} className="axis-label">{date.toLocaleDateString('es-MX', { month: 'short', year: 'numeric', timeZone: 'UTC' }).toUpperCase()}</text>; })}
+              {crosshair && <g className="crosshair-layer" pointerEvents="none"><line x1={crosshair.x} x2={crosshair.x} y1={chart.padding.top} y2={chart.height - chart.padding.bottom} /><line x1={chart.padding.left} x2={chart.width - chart.padding.right} y1={crosshair.y} y2={crosshair.y} /><g transform={`translate(${Math.max(24, Math.min(chart.width - chart.padding.right - 130, crosshair.x - 65))},${chart.height - chart.padding.bottom + 8})`}><rect width="130" height="27" rx="4" /><text x="65" y="18" textAnchor="middle">{crossDate}</text></g><g transform={`translate(${chart.width - chart.padding.right},${Math.max(chart.padding.top, Math.min(chart.height - chart.padding.bottom - 27, crosshair.y - 13))})`}><rect width="88" height="27" rx="4" /><text x="44" y="18" textAnchor="middle">{formatPrice(crossPrice, market.currency).replace(/[A-Z$]/g, '')}</text></g></g>}
+              {market.price > 0 && <><line x1={chart.padding.left} x2={chart.width - chart.padding.right} y1={chart.y(market.price)} y2={chart.y(market.price)} className="price-line" /><g transform={`translate(${chart.width - chart.padding.right},${chart.y(market.price) - 15})`}><rect width="88" height="30" rx="5" fill="#31c7d0" /><text x="7" y="20" fill="#031014" fontSize="13" fontWeight="700">{formatPrice(market.price, market.currency).replace(/[A-Z$]/g, '')}</text></g></>}
+              {[0, .33, .66, 1].map((part) => { const index = chart.start + Math.round((chart.visibleCount - 1) * part), date = new Date(timeAtIndex(index)); return <text key={part} x={chart.x(index)} y={chart.height - 18} textAnchor={part === 0 ? 'start' : part === 1 ? 'end' : 'middle'} className="axis-label">{date.toLocaleDateString('es-MX', { month: 'short', year: 'numeric', timeZone: 'UTC' }).toUpperCase()}</text>; })}
               <rect className="price-axis-hit" x={chart.width - chart.padding.right} y={chart.padding.top} width={chart.padding.right} height={chart.innerH} fill="transparent" />
             </svg>
             {loading && <div className="loading-state">Actualizando historial…</div>}
