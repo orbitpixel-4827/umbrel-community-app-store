@@ -95,6 +95,66 @@ class WebTests(unittest.TestCase):
     def test_daily_limit(self):
         day=time.strftime('%Y-%m-%d',time.gmtime());self.store.db.execute('INSERT INTO quotas VALUES (?,?,?,?,?)',('voice',day,40,0,0))
         with self.assertRaises(core.Problem):self.store.reserve('voice',40,5)
+    def scan(self):
+        return server.App(self.store).post('/api/recognize',{'image':base64.b64encode(b'\xff\xd8\xff'+b'x'*100).decode()},'fixture-session')
+    def test_old_shared_daily_limit_and_pause_do_not_block_new_scans(self):
+        self.store.record(self.dex(),'imagen','manual',str(uuid.uuid4()))
+        self.store.set('openrouter_key','fixture-key')
+        day=time.strftime('%Y-%m-%d',time.gmtime())
+        self.store.db.execute('INSERT INTO quotas VALUES (?,?,?,?,?)',('vision',day,20,time.time(),time.time()+86400))
+        with patch.object(core,'recognize',return_value={'candidates':[],'media':'otro'}) as recognize:
+            self.assertIn('ticket',self.scan());self.assertEqual(recognize.call_count,1)
+        self.assertEqual(len(self.store.entries()),1)
+    def test_recognition_does_not_add_daily_cap(self):
+        self.store.set('openrouter_key','fixture-key')
+        day=time.strftime('%Y-%m-%d',time.gmtime())
+        self.store.db.execute('INSERT INTO quotas VALUES (?,?,?,?,?)',('vision:openrouter',day,1000,0,0))
+        with patch.object(core,'recognize',return_value={'candidates':[],'media':'otro'}):self.scan()
+        self.assertEqual(self.store.db.execute('SELECT count FROM quotas WHERE kind=?',('vision:openrouter',)).fetchone()[0],1001)
+    def test_provider_failure_does_not_pause_other_provider(self):
+        self.store.set('gemini_key','fixture-google');self.store.set('openrouter_key','fixture-openrouter')
+        self.store.set('preferences',{'provider':'gemini'})
+        with patch.object(core,'recognize',side_effect=core.Problem(429,'Gemini quota',retry_after=120)):
+            with self.assertRaises(core.Problem):self.scan()
+        with patch.object(core,'recognize',return_value={'candidates':[],'media':'otro'}) as recognize:
+            with self.assertRaises(core.Problem) as error:self.scan()
+            self.assertIn('Gemini',error.exception.message);self.assertEqual(recognize.call_count,0)
+            self.store.set('preferences',{'provider':'openrouter'});self.scan();self.assertEqual(recognize.call_count,1)
+        pause=self.store.db.execute('SELECT pause FROM quotas WHERE kind=?',('vision:gemini',)).fetchone()[0]
+        self.assertGreater(pause-time.time(),119)
+    def test_recognition_cooldown_persists_after_restart_without_daily_cap(self):
+        self.store.reserve('vision:openrouter',None,20)
+        self.store.db.close();self.store=server.Store(self.temp.name)
+        with self.assertRaises(core.Problem):self.store.reserve('vision:openrouter',None,20)
+    def test_openrouter_quota_query_returns_only_safe_counters_and_no_inference(self):
+        self.store.set('openrouter_key','fixture-secret-key')
+        raw={'data':{'label':'fixture-secret-key','limit_remaining':123,'free_model_daily_requests':{'used':11,'limit':50,'remaining':39,'private':'fixture-secret-key'}}}
+        with patch.object(core,'fetch_json',return_value=raw) as fetcher:
+            result=server.App(self.store).post('/api/check-recognition',{},'fixture-session')
+        self.assertEqual(result['daily'],{'used':11,'limit':50,'remaining':39});self.assertNotIn('fixture-secret-key',json.dumps(result))
+        self.assertEqual(fetcher.call_count,1);self.assertEqual(fetcher.call_args.args,('https://openrouter.ai/api/v1/key',))
+        self.assertEqual(self.store.db.execute('SELECT count(*) FROM quotas').fetchone()[0],0)
+    def test_openrouter_missing_or_invalid_counter_is_not_invented(self):
+        for quota in (None,{}, {'used':0,'limit':50,'remaining':True}, {'used':0,'limit':50,'remaining':-1}):
+            with patch.object(core,'fetch_json',return_value={'data':{'free_model_daily_requests':quota}}):
+                self.assertIsNone(core.recognition_access('openrouter','fixture-key')['daily'])
+    def test_google_recognition_access_does_not_claim_remaining_quota(self):
+        with patch.object(core,'fetch_json',return_value={'name':core.VISION_MODEL}) as fetcher:
+            result=core.recognition_access('gemini','fixture-key')
+        self.assertIsNone(result['daily']);self.assertIn('AI Studio',result['message']);self.assertEqual(fetcher.call_count,1)
+    def test_openrouter_error_diagnostics_are_sanitized_and_distinct(self):
+        for code in (401,402,429,503):
+            message=core.openrouter_error(code,{'error':{'message':'fixture-secret-key'}})
+            self.assertIn('OpenRouter',message);self.assertNotIn('fixture-secret-key',message)
+        self.assertIn('saturado',core.openrouter_error(429,{'error':{'metadata':{'provider_code':429}}}))
+        self.assertIn('créditos',core.openrouter_error(402,{}))
+        self.assertIn('Consultar cuota',core.openrouter_error(429,{}))
+    def test_provider_error_keeps_retry_after_without_raw_error_body(self):
+        error=urllib.error.HTTPError('https://openrouter.ai/api/v1/chat/completions',429,'limited',{'Retry-After':'120'},io.BytesIO(b'{"error":{"message":"fixture-secret-key"}}'))
+        with patch.object(core.OPENER,'open',side_effect=error):
+            with self.assertRaises(core.Problem) as problem:core.fetch(error.url)
+        self.assertEqual(problem.exception.retry_after,120);self.assertNotIn('fixture-secret-key',problem.exception.message)
+        self.assertIsNone(core.retry_delay({'Retry-After':'bad'}));self.assertEqual(core.retry_delay({'Retry-After':'999999'}),86400)
     def test_ticket_one_scan_one_encounter(self):
         d=self.dex();session='fixture-session';ticket='fixture-ticket';self.store.db.execute('INSERT INTO tickets VALUES (?,?,?,?,0)',(ticket,session,'{}',int(time.time())+300));self.store.record(d,'imagen','scan',str(uuid.uuid4()),ticket,session)
         with self.assertRaises(core.Problem):self.store.record(d,'imagen','scan',str(uuid.uuid4()),ticket,session)
@@ -190,6 +250,33 @@ class HTTPTests(WebTests):
         status,entry,_=self.request('/api/encounters',{'ticket':scan['ticket'],'candidate':0,'lookup':'charizard-mega-x'})
         self.assertEqual(status,200);self.assertEqual(entry['species'],5);self.assertEqual(entry['source'],'scan');self.assertEqual(entry['media'],'peluche')
         self.assertEqual(self.request('/api/encounters',{'ticket':scan['ticket'],'candidate':0})[0],409);self.assertEqual(len(self.store.entries()),1)
+    def test_http_background_scan_and_registration_keep_one_encounter(self):
+        self.auth();self.store.set('openrouter_key','fixture-only-key')
+        result={'candidates':[{'id':5,'slug':'charmeleon','certainty':'high','transformation':'none','teraType':''}],'media':'peluche'}
+        image=base64.b64encode(b'\xff\xd8\xff'+b'fixture-image'*30).decode();identity=str(uuid.uuid4())
+        with patch.object(core,'recognize',return_value=result) as recognize:
+            status,started,_=self.request('/api/scan-jobs',{'id':identity,'operation':'recognize','input':{'image':image}});self.assertEqual(status,200)
+            for _ in range(100):
+                value=self.request('/api/scan-jobs/'+started['job'])[1]
+                if value['state']!='working':break
+                time.sleep(.01)
+            self.assertEqual(value['state'],'done');self.assertEqual(recognize.call_count,1)
+        scan=value['result'];status,started,_=self.request('/api/scan-jobs',{'operation':'encounters','input':{'ticket':scan['ticket'],'candidate':0,'id':str(uuid.uuid4())}});self.assertEqual(status,200)
+        for _ in range(100):
+            value=self.request('/api/scan-jobs/'+started['job'])[1]
+            if value['state']!='working':break
+            time.sleep(.01)
+        self.assertEqual(value['state'],'done');self.assertEqual(value['result']['species'],5);self.assertEqual(len(self.store.entries()),1)
+        for _ in range(4):self.assertEqual(self.request('/api/scan-jobs/'+started['job'])[1],value)
+        self.assertEqual(len(self.store.entries()),1)
+    def test_http_job_is_bound_to_session_and_cannot_start_without_csrf(self):
+        self.auth();self.assertEqual(self.request('/api/scan-jobs',{'operation':'recognize','input':{}},csrf='wrong')[0],403)
+        job=self.http.app.start_job({'operation':'recognize','input':{}},'other-session')
+        self.assertEqual(self.request('/api/scan-jobs/'+job['job'])[0],404)
+    def test_http_chatgpt_import_rejects_plain_http(self):
+        self.auth()
+        with patch.object(self.http.app.chatgpt,'import_credentials') as importer:self.assertEqual(self.request('/api/chatgpt/import',{})[0],400)
+        importer.assert_not_called()
     def test_http_https_cookie_and_configured_origin(self):
         with patch.dict(os.environ,{'POKEDEX_BASE_URL':'https://umbrel.local:8443'}):
             status,_,headers=self.request('/api/login',{'password':'fixture-password-2026'},origin='https://umbrel.local:8443')

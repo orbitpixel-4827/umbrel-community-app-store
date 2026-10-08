@@ -51,7 +51,7 @@ test('blocked audio reports an error instead of leaving the test button waiting 
 });
 function cameraHarness(){
  const time=clock(),messages=[],analyses=[],video={videoWidth:1280,videoHeight:960,async play(){}},stream={getTracks:()=>[{stop(){}}]};
- const scope={...time,Promise,Error,window:{isSecureContext:true},navigator:{mediaDevices:{getUserMedia:async()=>stream}},document:{hidden:false,createElement:()=>({getContext:()=>({drawImage(){}}),toDataURL:()=> 'data:image/jpeg;base64,frame'})},audio:{unlock:async()=>{}},view:{page:'camera'},epoch:1,lastScan:100000,scanBusy:false,cameraStream:stream,scanTimer:null,controller:null,
+ const scope={...time,Promise,Error,window:{isSecureContext:true},navigator:{mediaDevices:{getUserMedia:async()=>stream}},document:{hidden:false,createElement:()=>({getContext:()=>({drawImage(){}}),toDataURL:()=> 'data:image/jpeg;base64,frame'})},audio:{unlock:async()=>{}},view:{page:'camera'},epoch:1,lastScan:100000,scanBusy:false,cameraStream:stream,scanTimer:null,controller:null,pendingScan:null,
   $:q=>q==='#camera'?video:{textContent:''},toast:m=>messages.push(m),cameraStatus:m=>messages.push(m),analyze:async image=>analyses.push(image),go(next){scope.stopCamera();scope.view=next;scope.epoch++;},chooseImage(){},renderCamera(){}};
  vm.createContext(scope);
  vm.runInContext(fragment('function stopCamera()','function go(')+fragment('async function openCamera()','function chooseImage('),scope);
