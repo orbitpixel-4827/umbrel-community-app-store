@@ -1,6 +1,16 @@
-const VERSION='pokedex-shell-v1.3.1';
-const SHELL=['/','/index.html','/styles.css','/app.mjs','/domain.mjs','/transport.mjs','/manifest.webmanifest','/assets/icon.svg','/assets/icon-192.png','/assets/icon-512.png','/assets/game-catalog.json','/assets/type-chart.json'];
-self.addEventListener('install',e=>e.waitUntil(caches.open(VERSION).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
-self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('pokedex-shell-')&&k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
-async function network(request){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);try{return await fetch(request,{signal:controller.signal});}finally{clearTimeout(timer);}}
-self.addEventListener('fetch',e=>{const url=new URL(e.request.url);if(e.request.method!=='GET'||url.origin!==location.origin)return;if(url.pathname==='/api/asset'){e.respondWith(network(e.request).then(async r=>{const c=await caches.open('pokedex-assets-v1');if(r.ok)c.put(e.request,r.clone());else if(r.status===401)c.delete(e.request);return r;}).catch(async()=>await caches.match(e.request)||Response.error()));return;}if(url.pathname.startsWith('/api/'))return;e.respondWith(network(e.request).then(async response=>{if(response.ok&&SHELL.includes(url.pathname)){const c=await caches.open(VERSION);c.put(e.request,response.clone());}return response;}).catch(async()=>{const c=await caches.open(VERSION);return await c.match(e.request)||(e.request.mode==='navigate'?await c.match('/'):Response.error());}));});
+// Retire the cached interface for clients installed before 1.3.2.
+// New clients load directly from Umbrel and do not register a worker.
+const RELEASE='1.3.2';
+self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
+self.addEventListener('activate',event=>event.waitUntil((async()=>{
+ const keys=await caches.keys();
+ await Promise.allSettled(keys.filter(key=>key.startsWith('pokedex-shell-')||key==='pokedex-assets-v1').map(key=>caches.delete(key)));
+ await self.registration.unregister();
+ const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+ await Promise.allSettled(clients.map(client=>{
+  const url=new URL(client.url);
+  if(url.origin!==location.origin||!['/','/index.html'].includes(url.pathname)||url.searchParams.get('v')===RELEASE)return;
+  url.searchParams.set('v',RELEASE);
+  return client.navigate(url.href);
+ }));
+})()));

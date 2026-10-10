@@ -2,19 +2,25 @@ export async function request(path,init={},options={}){
  const read=options.binary?'arrayBuffer':'json',attempts=(init.method||'GET')==='GET'?(options.retries??1)+1:1;
  for(let attempt=0;attempt<attempts;attempt++){
   const controller=new AbortController();let timedOut=false;
-  const cancel=()=>controller.abort();if(options.signal?.aborted)cancel();else options.signal?.addEventListener('abort',cancel,{once:true});
-  const timer=setTimeout(()=>{timedOut=true;controller.abort();},options.timeout??12000);
+  if(options.signal?.aborted)throw Object.assign(Error('Operación cancelada.'),{name:'AbortError'});
+  let expire,cancel;
+  const deadline=new Promise((_,reject)=>{
+   cancel=()=>{controller.abort();reject(Object.assign(Error('Operación cancelada.'),{name:'AbortError'}));};
+   expire=()=>{timedOut=true;controller.abort();reject(Object.assign(Error('timeout'),{name:'AbortError'}));};
+  });
+  options.signal?.addEventListener('abort',cancel,{once:true});
+  const timer=setTimeout(expire,options.timeout??12000);
   try{
-   const response=await fetch(path,{...init,signal:controller.signal});
+   const response=await Promise.race([fetch(path,{cache:'no-store',...init,signal:controller.signal}),deadline]);
    const mime=response.headers.get('Content-Type')||'';
-   if(!options.binary&&(!mime.includes('application/json')||response.redirected)){
-    const error=Error('El acceso web devolvió una pantalla de inicio de sesión. Abre Umbrel, inicia sesión y vuelve a Pokédex.');error.gateway=true;throw error;
+   if((!options.binary||!response.ok)&&(!mime.includes('application/json')||response.redirected)){
+    const error=Error(response.status>=400?'El servidor devolvió un error HTTP '+response.status+'.':'El acceso web devolvió una pantalla de inicio de sesión. Abre Umbrel, inicia sesión y vuelve a Pokédex.');error.gateway=response.status<400;error.status=response.status;error.server=response.status>=400;throw error;
    }
-   let data;try{data=await response[response.ok?read:'json']();}catch(err){if(err.name==='AbortError')throw err;const error=Error('La respuesta de Pokédex llegó incompleta. Comprueba la conexión antes de repetir el escaneo.');error.connection=true;throw error;}
+   let data;try{data=await Promise.race([response[response.ok?read:'json'](),deadline]);}catch(err){if(err.name==='AbortError')throw err;const error=Error('La respuesta de Pokédex llegó incompleta. Comprueba la conexión antes de repetir el escaneo.');error.connection=true;throw error;}
    return {response,data};
   }catch(err){
    if(options.signal?.aborted)throw Object.assign(Error('Operación cancelada.'),{name:'AbortError'});
-   if(err.gateway)throw err;
+   if(err.gateway||err.server)throw err;
    if(attempt+1<attempts)continue;
    const error=Error(timedOut?'Pokédex tardó demasiado en responder. El reconocimiento no se reenvió.':'No se pudo comunicar con Pokédex en esta dirección. Comprueba Tailscale y la conexión HTTPS; tus registros siguen en Umbrel.');error.connection=true;throw error;
   }finally{clearTimeout(timer);options.signal?.removeEventListener('abort',cancel);}
