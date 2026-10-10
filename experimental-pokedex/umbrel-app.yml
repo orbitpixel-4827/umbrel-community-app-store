@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: ai
 name: Pokédex
-version: "1.3.0"
+version: "1.3.1"
 tagline: Escanea, descubre y consulta tus Pokémon
 icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-pokedex/icon.png
 requiresHttps: true
@@ -26,12 +26,12 @@ description: >-
   copia JSON de la app anterior. Las claves y la contraseña no se incluyen en esa
   copia; la guía del paquete explica cómo trasladar también la base completa.
 releaseNotes: >-
-  Añade reconocimiento con tu plan de ChatGPT mediante autorización oficial,
-  sin una clave de API de pago. El escaneo continúa en el servidor y permite
-  consultar el resultado tras una desconexión sin reenviar la imagen. Mejora
-  los tiempos de espera y el diagnóstico de acceso por Tailscale y HTTPS.
-  Elimina el tope diario local de reconocimiento; siguen aplicando los límites
-  del proveedor y la pausa entre análisis. Conserva tus registros y ajustes.
+  Corrige la recuperación de conexión al volver a Pokédex en iPhone. Comprueba
+  de nuevo la sesión con esperas crecientes y permite reintentar desde el aviso
+  de datos guardados sin sustituir formularios ni ventanas. Reanuda el escaneo
+  automático si la conexión falló antes de enviar la imagen. Si ya se envió,
+  conserva el trabajo pendiente y no duplica solicitudes de reconocimiento.
+  Conserva tus registros, claves y ajustes. No modifica certificados.
 developer: Experimental Labs
 website: https://github.com/orbitpixel-4827/umbrel-community-app-store
 dependencies: []
