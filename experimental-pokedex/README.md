@@ -1,4 +1,4 @@
-# Pokédex para Umbrel · 1.3.0
+# Pokédex para Umbrel · 1.3.1
 
 ![Pokédex roja](icon.png)
 
@@ -10,7 +10,7 @@ La contraseña inicial de esta instalación se muestra en Umbrel; puedes cambiar
 
 Configura el certificado de Umbrel en el iPhone desde **Ajustes → Avanzados → Red → Acceso HTTPS → Cómo usar HTTPS → Ajustes avanzados de certificados → iOS**. Después abre la app con HTTPS y permite el acceso a la cámara. Al abrir el escáner se analiza una imagen a los 3,5 segundos, sin pulsar el disparador. Si todavía no han pasado los 20 segundos entre análisis, se indica la espera y se inicia automáticamente al terminar. Salir de la cámara cancela cualquier análisis programado.
 
-Si el navegador no permite la cámara en vivo, se ofrece tomar una foto o elegir una imagen. El certificado local de Umbrel no cubre las IP de Tailscale: para cámara en vivo fuera de casa hace falta una dirección HTTPS válida accesible por esa red privada.
+Si el navegador no permite la cámara en vivo, se ofrece tomar una foto o elegir una imagen. La dirección utilizada debe estar incluida en el certificado de Umbrel y el iPhone debe confiar en su autoridad. En la instalación comprobada, el certificado incluye la IP local y la de Tailscale. Instalar un perfil no activa automáticamente la confianza SSL/TLS: en el iPhone entra en Ajustes → General → Información → Ajustes de confianza de certificados y activa únicamente el certificado de tu Umbrel. Consulta la [guía de Apple](https://support.apple.com/en-us/102390). Aceptar una advertencia de Safari no sustituye esta configuración.
 
 En Safari puedes añadir Pokédex a la pantalla de inicio; conserva el mismo ícono rojo. La app activa una sesión de reproducción para voz y sonidos también desde ese acceso directo, y vuelve a activar el audio si iOS lo interrumpe al abrir la cámara. Probar voz muestra la preparación y reproducción o un error, además de guardar los ajustes. El comportamiento físico del iPhone debe verificarse en el dispositivo.
 
@@ -36,7 +36,7 @@ Flujo implementado según la [documentación oficial de SIWC](https://developers
 
 El reconocimiento y la obtención de la ficha se ejecutan como trabajos privados del servidor. Las consultas cortas de progreso evitan mantener una petición abierta a través del proxy de Umbrel durante todo el análisis. Consultar el resultado no reenvía la foto. Si se pierde una respuesta, la app permite recuperar el trabajo pendiente y no inicia otro escaneo encima. Los trabajos temporales caducan a los 10 minutos o al reiniciar el proceso; los encuentros guardados permanecen en SQLite.
 
-El inicio tiene un tiempo de espera definido y reintenta una consulta de conexión una vez. Nunca reintenta automáticamente el envío de una foto. Los errores de sesión del proxy, HTTPS/Tailscale, cuota del proveedor y renovación de ChatGPT se distinguen. Las fichas guardadas pueden verse sin conexión, pero su caché no autoriza operaciones nuevas con una sesión antigua.
+El inicio tiene un tiempo de espera definido y reintenta una consulta de conexión una vez. Si utiliza datos guardados, revalida la sesión con esperas crecientes de hasta 30 segundos mientras está visible. También comprueba el acceso al regresar del segundo plano, recuperar el foco o recibir un evento de red. Las comprobaciones simultáneas se agrupan y no sustituyen formularios ni la cámara. El aviso permite reintentar y consultar el motivo; se retira solo tras recibir la sesión actual desde Umbrel. Si falla la comprobación de conexión antes de enviar una imagen de cámara, el escaneo vuelve a programarse al recuperar la sesión. Si la imagen ya se envió o no se sabe si llegó, solo permite consultar el mismo trabajo; no reenvía la imagen. Los errores de cuota no programan otro reconocimiento. Al volver del segundo plano, la cámara queda pausada hasta tocar Escanear ahora. Los errores de sesión del proxy, HTTPS/Tailscale, cuota del proveedor y renovación de ChatGPT se distinguen. Las fichas guardadas pueden verse sin conexión, pero su caché no autoriza operaciones nuevas con una sesión antigua.
 
 En Ajustes → Comprobar conexión puedes verificar la dirección, respuesta del servidor y disponibilidad de cámara sin gastar reconocimiento. Que la pantalla guardada abra no demuestra que el navegador pueda comunicarse con el servidor en ese momento.
 
@@ -72,9 +72,9 @@ También puedes generar copias completas de esta versión con `python manage.py 
 
 ## Publicación y validación
 
-La imagen `ghcr.io/orbitpixel-4827/pokedex:1.3.0` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
+La imagen `ghcr.io/orbitpixel-4827/pokedex:1.3.1` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
 
-Pasaron 65 pruebas de servidor y datos, 11 de autorización/renovación de ChatGPT y trabajos privados, 37 de lógica JavaScript y 4 de migración completa (117 en total). Los tests automáticos simulan los proveedores. Además, el propietario autorizó el acceso oficial a su plan: se verificó la autorización real y, en el navegador interno con un servidor de prueba, ChatGPT reconoció dos imágenes consecutivas de Cyndaquil y Charmeleon, que quedaron guardados como dos encuentros distintos. Esta prueba confirma el flujo con esas imágenes; no constituye una evaluación general de precisión. Se verificaron también las cookies separadas, el origen HTTPS con las cabeceras del proxy y la conservación de encuentros, claves y contraseña en una copia de prueba.
+Pasaron 65 pruebas de servidor y datos, 11 de autorización/renovación de ChatGPT y trabajos privados, 49 de lógica JavaScript y 4 de migración completa (129 en total). Los tests automáticos simulan los proveedores. Además, el propietario autorizó el acceso oficial a su plan: se verificó la autorización real y, en el navegador interno con un servidor de prueba, ChatGPT reconoció dos imágenes consecutivas de Cyndaquil y Charmeleon, que quedaron guardados como dos encuentros distintos. Esta prueba confirma el flujo con esas imágenes; no constituye una evaluación general de precisión. Se verificaron también las cookies separadas, el origen HTTPS con las cabeceras del proxy y la conservación de encuentros, claves y contraseña en una copia de prueba.
 
 La instalación real mediante Umbrel, su certificado y la cámara del iPhone deben verificarse en los dispositivos del propietario; estas pruebas no se presentan como verificación en un Umbrel real.
 

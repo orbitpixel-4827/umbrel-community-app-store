@@ -369,7 +369,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             parsed=urllib.parse.urlparse(self.path);path=parsed.path;query=urllib.parse.parse_qs(parsed.query)
-            if path=='/health':return self.reply(200,{'ok':True,'version':'1.3.0'})
+            if path=='/health':return self.reply(200,{'ok':True,'version':'1.3.1'})
             if path.startswith('/api/'):
                 session,csrf=self.session()
                 if path.startswith('/api/scan-jobs/'):
