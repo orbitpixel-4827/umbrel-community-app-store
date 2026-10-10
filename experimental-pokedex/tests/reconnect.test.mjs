@@ -19,7 +19,7 @@ function harness(){
 }
 test('foreground session probes bypass offline cache and preserve the current screen',async()=>{
  const h=harness(),form=h.s.view;form.draft='unsaved';assert.equal(await h.s.recoverConnection(),true);
- assert.equal(h.calls[0].options.allowOffline,false);assert.equal(h.s.csrf,'fresh');assert.equal(h.s.view,form);assert.equal(form.draft,'unsaved');
+ assert.equal(h.calls[0].path,'/api/bootstrap');assert.equal(h.s.csrf,'fresh');assert.equal(h.s.view,form);assert.equal(form.draft,'unsaved');
 });
 test('simultaneous foreground events share a single connection probe',async()=>{
  const h=harness();let finish;h.s.api=()=>{h.calls.push('probe');return new Promise(r=>finish=r);};

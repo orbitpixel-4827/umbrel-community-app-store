@@ -3,6 +3,7 @@ import copy
 import io
 import json
 import os
+import socket
 from pathlib import Path
 import sys
 import tempfile
@@ -230,6 +231,17 @@ class HTTPTests(WebTests):
         status,value,headers=self.request('/api/login',{'password':'fixture-password-2026'});self.assertEqual(status,200);self.cookie=headers['Set-Cookie'].split(';')[0];self.csrf=value['csrf']
     def test_http_auth_and_headers(self):
         status,value,_=self.request('/api/bootstrap');self.assertEqual(status,401);self.assertTrue(value['auth']);self.auth();status,value,headers=self.request('/api/bootstrap');self.assertEqual(status,200);self.assertNotIn('gemini_key',value['settings']);self.assertIn("frame-ancestors 'none'",headers['Content-Security-Policy'])
+    def test_http_idle_keepalive_releases_suspended_browser_connection(self):
+        with patch.object(server.Handler,'idle_timeout',0.1):
+            with socket.create_connection(('127.0.0.1',self.http.server_port),timeout=2) as connection:
+                connection.sendall(b'GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n')
+                received=b''
+                while True:
+                    data=connection.recv(4096)
+                    if not data:break
+                    received+=data
+                self.assertIn(b'200 OK',received)
+                self.assertIn(b'"version":"1.3.2"',received)
     def test_http_csrf_and_cross_origin(self):
         self.auth();self.assertEqual(self.request('/api/settings',{'robot':False},csrf='bad')[0],403);self.assertEqual(self.request('/api/settings',{'robot':False},origin='https://evil.example')[0],403);self.assertEqual(self.request('/api/settings',{'robot':False})[0],200)
     def test_http_record_delete_export_and_restart_data(self):
