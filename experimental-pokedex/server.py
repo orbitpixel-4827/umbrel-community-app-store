@@ -326,6 +326,10 @@ class App:
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version='HTTP/1.1'
+    idle_timeout=30
+    def setup(self):
+        super().setup()
+        self.connection.settimeout(self.idle_timeout)
     def log_message(self,format,*args): pass # No credentials, images, query strings or upstream bodies in logs.
     @property
     def app(self): return self.server.app
@@ -369,7 +373,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             parsed=urllib.parse.urlparse(self.path);path=parsed.path;query=urllib.parse.parse_qs(parsed.query)
-            if path=='/health':return self.reply(200,{'ok':True,'version':'1.3.1'})
+            if path=='/health':return self.reply(200,{'ok':True,'version':'1.3.2'})
             if path.startswith('/api/'):
                 session,csrf=self.session()
                 if path.startswith('/api/scan-jobs/'):

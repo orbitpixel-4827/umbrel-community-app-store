@@ -1,4 +1,4 @@
-# Pokédex para Umbrel · 1.3.1
+# Pokédex para Umbrel · 1.3.2
 
 ![Pokédex roja](icon.png)
 
@@ -36,9 +36,13 @@ Flujo implementado según la [documentación oficial de SIWC](https://developers
 
 El reconocimiento y la obtención de la ficha se ejecutan como trabajos privados del servidor. Las consultas cortas de progreso evitan mantener una petición abierta a través del proxy de Umbrel durante todo el análisis. Consultar el resultado no reenvía la foto. Si se pierde una respuesta, la app permite recuperar el trabajo pendiente y no inicia otro escaneo encima. Los trabajos temporales caducan a los 10 minutos o al reiniciar el proceso; los encuentros guardados permanecen en SQLite.
 
-El inicio tiene un tiempo de espera definido y reintenta una consulta de conexión una vez. Si utiliza datos guardados, revalida la sesión con esperas crecientes de hasta 30 segundos mientras está visible. También comprueba el acceso al regresar del segundo plano, recuperar el foco o recibir un evento de red. Las comprobaciones simultáneas se agrupan y no sustituyen formularios ni la cámara. El aviso permite reintentar y consultar el motivo; se retira solo tras recibir la sesión actual desde Umbrel. Si falla la comprobación de conexión antes de enviar una imagen de cámara, el escaneo vuelve a programarse al recuperar la sesión. Si la imagen ya se envió o no se sabe si llegó, solo permite consultar el mismo trabajo; no reenvía la imagen. Los errores de cuota no programan otro reconocimiento. Al volver del segundo plano, la cámara queda pausada hasta tocar Escanear ahora. Los errores de sesión del proxy, HTTPS/Tailscale, cuota del proveedor y renovación de ChatGPT se distinguen. Las fichas guardadas pueden verse sin conexión, pero su caché no autoriza operaciones nuevas con una sesión antigua.
+La interfaz y la sesión se cargan directamente desde Umbrel. Ya no se instala una interfaz sin conexión ni se guardan respuestas de sesión en IndexedDB. Al actualizar, un trabajador de migración retira las cachés antiguas de Pokédex, se desregistra y recarga una sola vez las ventanas de inicio antiguas. Los módulos llevan la versión en su dirección para evitar mezclar archivos de diferentes versiones. La colección y las claves permanecen en el servidor.
 
-En Ajustes → Comprobar conexión puedes verificar la dirección, respuesta del servidor y disponibilidad de cámara sin gastar reconocimiento. Que la pantalla guardada abra no demuestra que el navegador pueda comunicarse con el servidor en ese momento.
+Las peticiones tienen un plazo que cubre también la lectura de la respuesta. Solo se reintentan consultas GET; una imagen enviada no se reenvía automáticamente. Un corte temporal al iniciar muestra el error real y reintenta mientras la app está visible. Al regresar del segundo plano o recuperar la red, se revalida la sesión sin sustituir formularios ni cámara. El aviso «Reconectando · Reintentar» aparece únicamente tras un fallo real de comunicación. Una sesión caducada abre el acceso; una respuesta HTML del proxy no se confunde con una respuesta de la app.
+
+El almacenamiento opcional de audio del navegador tiene un plazo y no bloquea el arranque. Las conexiones HTTP inactivas se cierran a los 30 segundos para liberar los recursos que dejan abiertos los navegadores suspendidos. Si falla la comprobación antes de enviar una imagen, el escaneo se programa al recuperar la sesión. Si ya se envió, se conserva el mismo trabajo pendiente. Los errores de cuota no programan otro reconocimiento.
+
+En Ajustes → Comprobar conexión se comprueba el servidor y la disponibilidad de cámara sin consumir reconocimiento. HTTPS sigue requiriendo un certificado válido y de confianza en el dispositivo.
 
 ## Datos y claves
 
@@ -72,9 +76,9 @@ También puedes generar copias completas de esta versión con `python manage.py 
 
 ## Publicación y validación
 
-La imagen `ghcr.io/orbitpixel-4827/pokedex:1.3.1` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
+La imagen `ghcr.io/orbitpixel-4827/pokedex:1.3.2` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
 
-Pasaron 65 pruebas de servidor y datos, 11 de autorización/renovación de ChatGPT y trabajos privados, 49 de lógica JavaScript y 4 de migración completa (129 en total). Los tests automáticos simulan los proveedores. Además, el propietario autorizó el acceso oficial a su plan: se verificó la autorización real y, en el navegador interno con un servidor de prueba, ChatGPT reconoció dos imágenes consecutivas de Cyndaquil y Charmeleon, que quedaron guardados como dos encuentros distintos. Esta prueba confirma el flujo con esas imágenes; no constituye una evaluación general de precisión. Se verificaron también las cookies separadas, el origen HTTPS con las cabeceras del proxy y la conservación de encuentros, claves y contraseña en una copia de prueba.
+Pasaron 66 pruebas de servidor y datos, 11 de autorización/renovación de ChatGPT y trabajos privados, 72 de lógica JavaScript y 4 de migración completa (153 en total). Los tests automáticos simulan los proveedores. Además, el propietario autorizó el acceso oficial a su plan: se verificó la autorización real y, en el navegador interno con un servidor de prueba, ChatGPT reconoció dos imágenes consecutivas de Cyndaquil y Charmeleon, que quedaron guardados como dos encuentros distintos. Esta prueba confirma el flujo con esas imágenes; no constituye una evaluación general de precisión. Se verificaron también las cookies separadas, el origen HTTPS con las cabeceras del proxy y la conservación de encuentros, claves y contraseña en una copia de prueba.
 
 La instalación real mediante Umbrel, su certificado y la cámara del iPhone deben verificarse en los dispositivos del propietario; estas pruebas no se presentan como verificación en un Umbrel real.
 
