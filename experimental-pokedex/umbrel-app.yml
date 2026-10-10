@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: ai
 name: Pokédex
-version: "1.3.1"
+version: "1.3.2"
 tagline: Escanea, descubre y consulta tus Pokémon
 icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-pokedex/icon.png
 requiresHttps: true
@@ -26,12 +26,13 @@ description: >-
   copia JSON de la app anterior. Las claves y la contraseña no se incluyen en esa
   copia; la guía del paquete explica cómo trasladar también la base completa.
 releaseNotes: >-
-  Corrige la recuperación de conexión al volver a Pokédex en iPhone. Comprueba
-  de nuevo la sesión con esperas crecientes y permite reintentar desde el aviso
-  de datos guardados sin sustituir formularios ni ventanas. Reanuda el escaneo
-  automático si la conexión falló antes de enviar la imagen. Si ya se envió,
-  conserva el trabajo pendiente y no duplica solicitudes de reconocimiento.
-  Conserva tus registros, claves y ajustes. No modifica certificados.
+  Retira la interfaz antigua que podía quedar guardada en Safari y mostrar una
+  versión anterior con una sesión obsoleta. Carga los datos directamente desde
+  Umbrel y migra automáticamente la caché anterior sin borrar tu colección.
+  Corrige el arranque y la recuperación tras cortes de conexión, limita las
+  esperas de red y libera conexiones inactivas del navegador. El audio opcional
+  no bloquea el inicio. Conserva tus registros, claves y ajustes; no duplica
+  solicitudes de reconocimiento al reconectar.
 developer: Experimental Labs
 website: https://github.com/orbitpixel-4827/umbrel-community-app-store
 dependencies: []
