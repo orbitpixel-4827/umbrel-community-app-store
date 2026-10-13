@@ -7,7 +7,7 @@ services:
       APP_PORT: 8080
 
   web:
-    image: ghcr.io/orbitpixel-4827/ahorros-familiares:1.0.0@sha256:4fe0320f1c0aa27f1844724213492755acd6f747b6e03b7c86d4a977eae34a51
+    image: ghcr.io/orbitpixel-4827/ahorros-familiares:1.0.0@sha256:3c5f409f63193c2d66fd50a7f1141ed4aecbffa762908f76a8668dd2401e6059
     user: "1000:1000"
     init: true
     restart: on-failure
