@@ -1,7 +1,51 @@
 version: "3.7"
 
 services:
+  # Prepare Umbrel's bind mount before starting the unprivileged application.
+  init_data:
+    image: ghcr.io/orbitpixel-4827/ahorros-familiares:1.0.0@sha256:3c5f409f63193c2d66fd50a7f1141ed4aecbffa762908f76a8668dd2401e6059
+    user: "0:0"
+    restart: on-failure
+    network_mode: none
+    read_only: true
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - FOWNER
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      disable: true
+    command:
+      - python
+      - -c
+      - |
+        import os, stat
+        from pathlib import Path
+        directory = Path('/data')
+        if not stat.S_ISDIR(directory.lstat().st_mode):
+            raise RuntimeError('/data must be a directory')
+        os.chown(directory, 1000, 1000)
+        os.chmod(directory, stat.S_IMODE(directory.stat().st_mode) | 0o700)
+        for name in ('family_savings.db', 'family_savings.db-wal', 'family_savings.db-shm'):
+            path = directory / name
+            try:
+                mode = path.lstat().st_mode
+            except FileNotFoundError:
+                continue
+            if not stat.S_ISREG(mode):
+                raise RuntimeError(f'{name} must be a regular file')
+            os.chown(path, 1000, 1000)
+            os.chmod(path, stat.S_IMODE(mode) | 0o600)
+
   app_proxy:
+    depends_on:
+      web:
+        condition: service_healthy
     environment:
       APP_HOST: experimental-ahorros-familiares_web_1
       APP_PORT: 8080
@@ -11,6 +55,9 @@ services:
     user: "1000:1000"
     init: true
     restart: on-failure
+    depends_on:
+      init_data:
+        condition: service_completed_successfully
     environment:
       DATA_DIR: /data
       PORT: 8080

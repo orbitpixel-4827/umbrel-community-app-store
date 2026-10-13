@@ -4,7 +4,7 @@ name: Ahorros Familiares
 tagline: Ordena los ahorros de toda tu familia
 icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-ahorros-familiares/icon.png
 category: finance
-version: "1.0.0"
+version: "1.0.1"
 port: 8787
 description: >-
   Registra depósitos, retiros y traspasos por persona y tipo de ahorro.
@@ -19,9 +19,9 @@ repo: https://github.com/orbitpixel-4827/umbrel-community-app-store/tree/main/ex
 support: https://github.com/orbitpixel-4827/umbrel-community-app-store/issues
 gallery: []
 releaseNotes: >-
-  Primera versión para la tienda. Incluye el rediseño MiEstilo, depósitos,
-  retiros, traspasos entre tipos, eliminación con confirmación, filtros,
-  estados de cuenta PDF e instalación como web app en iPhone con el mismo icono.
+  Corrige el arranque en instalaciones nuevas de Umbrel. Prepara automáticamente
+  los permisos de la carpeta de datos antes de iniciar la app y conserva la base
+  existente al actualizar. No requiere configuraciones en la terminal.
 dependencies: []
 path: ""
 defaultUsername: ""

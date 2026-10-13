@@ -10,6 +10,11 @@ Umbrel guarda la base SQLite en `${APP_DATA_DIR}/data/family_savings.db`. La
 carpeta se monta fuera del contenedor, por lo que no se elimina al reiniciar o
 actualizar la aplicación.
 
+Desde la versión 1.0.1, un servicio de preparación ajusta automáticamente el
+propietario y los permisos de la carpeta y de los archivos SQLite antes del
+arranque. No modifica los registros. La app sigue ejecutándose como usuario
+sin privilegios y Umbrel espera a que esté saludable antes de abrir el acceso.
+
 ## Llevar la base de la instalación anterior
 
 Conéctate por SSH a Umbrel y, mientras la instalación anterior sigue encendida,
