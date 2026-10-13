@@ -4,7 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - "experimental-ahorros-familiares/**"
+      - "experimental-ahorros-familiares/Dockerfile"
+      - "experimental-ahorros-familiares/.dockerignore"
+      - "experimental-ahorros-familiares/app.py"
+      - "experimental-ahorros-familiares/manage.py"
+      - "experimental-ahorros-familiares/static/**"
+      - "experimental-ahorros-familiares/tests/**"
       - ".github/workflows/ahorros-familiares-image.yml"
   workflow_dispatch:
 
