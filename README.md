@@ -4,6 +4,12 @@ Tienda comunitaria personal para instalar aplicaciones reales en umbrelOS.
 
 La tienda ya está configurada y permanecerá vacía hasta que se añadan aplicaciones.
 
+## Aplicaciones disponibles
+
+- **Ahorros Familiares**: depósitos, retiros, traspasos, filtros y estados de cuenta PDF.
+- **GraphicView**: análisis técnico visual para mercados.
+- **Pokédex**: reconocimiento y consulta personal de Pokémon.
+
 ## Agregar la tienda en Umbrel
 
 1. Abre la App Store en tu Umbrel.

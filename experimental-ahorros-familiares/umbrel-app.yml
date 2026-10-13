@@ -1,0 +1,28 @@
+manifestVersion: 1
+id: experimental-ahorros-familiares
+name: Ahorros Familiares
+tagline: Ordena los ahorros de toda tu familia
+icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-ahorros-familiares/icon.png
+category: finance
+version: "1.0.0"
+port: 8787
+description: >-
+  Registra depósitos, retiros y traspasos por persona y tipo de ahorro.
+  Consulta el saldo familiar o aplica filtros individuales, revisa el historial
+  y genera estados de cuenta en PDF por periodos. Los datos permanecen en tu
+  propio Umbrel y sobreviven a reinicios y actualizaciones de la aplicación.
+developer: Experimental Labs
+website: https://github.com/orbitpixel-4827/umbrel-community-app-store
+submitter: Experimental Labs
+submission: ""
+repo: https://github.com/orbitpixel-4827/umbrel-community-app-store/tree/main/experimental-ahorros-familiares
+support: https://github.com/orbitpixel-4827/umbrel-community-app-store/issues
+gallery: []
+releaseNotes: >-
+  Primera versión para la tienda. Incluye el rediseño MiEstilo, depósitos,
+  retiros, traspasos entre tipos, eliminación con confirmación, filtros,
+  estados de cuenta PDF e instalación como web app en iPhone con el mismo icono.
+dependencies: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""

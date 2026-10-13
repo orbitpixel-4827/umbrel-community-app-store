@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#fafafa" />
+    <meta name="description" content="Control privado de ahorros familiares." />
+    <title>Ahorros Familiares</title>
+    <link rel="icon" href="/icon.png" type="image/png" sizes="512x512" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="miestilo is-loading">
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Ahorros Familiares, inicio">
+          <span class="brand-mark" aria-hidden="true">
+            <img src="/icon.png" alt="" />
+          </span>
+          <span><strong>Ahorros</strong><small>Familiares</small></span>
+        </a>
+        <div class="header-actions">
+          <button class="button button-ghost" data-open-dialog="statement-dialog">
+            <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"/></svg> Estado de cuenta
+          </button>
+          <button class="button button-ghost" data-open-dialog="people-dialog">
+            <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.5-3.5 2.3-5.2 5.5-5.2s5 1.7 5.5 5.2M18 7v6m-3-3h6"/></svg> Persona
+          </button>
+          <button class="button button-ghost" data-open-dialog="types-dialog">
+            <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z"/><path d="m4 12 8 4.5 8-4.5M4 16.5 12 21l8-4.5"/></svg> Tipo de ahorro
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section id="overview" class="overview" aria-labelledby="overview-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">PATRIMONIO FAMILIAR</p>
+              <h1 id="overview-title">Así van sus ahorros</h1>
+            </div>
+            <div class="filters" aria-label="Filtros del resumen">
+              <label>
+                <span>Persona</span>
+                <select id="filter-person"><option value="">Todas</option></select>
+              </label>
+              <label>
+                <span>Tipo de ahorro</span>
+                <select id="filter-type"><option value="">Todos</option></select>
+              </label>
+              <button id="clear-filters" class="text-button" type="button">Limpiar</button>
+            </div>
+          </div>
+
+          <div class="summary-grid" aria-live="polite">
+            <article class="balance-card">
+              <div class="card-label"><span class="status-dot"></span> Saldo familiar</div>
+              <strong id="balance-total">$0.00</strong>
+              <p id="summary-scope">Todas las personas · Todos los tipos</p>
+              <div class="balance-decoration" aria-hidden="true"></div>
+            </article>
+            <article class="metric-card metric-deposit">
+              <span class="metric-icon deposit-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v13m0 0 5-5m-5 5-5-5M5 21h14"/></svg></span>
+              <div><p>Depósitos</p><strong id="deposit-total">$0.00</strong></div>
+            </article>
+            <article class="metric-card metric-withdrawal">
+              <span class="metric-icon withdrawal-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21V8m0 0 5 5m-5-5-5 5M5 3h14"/></svg></span>
+              <div><p>Retiros</p><strong id="withdrawal-total">$0.00</strong></div>
+            </article>
+            <article class="metric-card metric-count">
+              <span class="metric-icon count-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg></span>
+              <div><p>Movimientos</p><strong id="movement-count">0</strong></div>
+            </article>
+          </div>
+        </section>
+
+        <div class="workspace-grid">
+          <section id="entry-panel" class="panel entry-panel" aria-labelledby="entry-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">NUEVO REGISTRO</p>
+                <h2 id="entry-title">Agregar movimiento</h2>
+              </div>
+              <span class="secure-label" title="Los datos se guardan en tu servidor"><span aria-hidden="true">●</span> Datos locales</span>
+            </div>
+
+            <div id="setup-empty" class="setup-empty hidden">
+              <div class="empty-icon" aria-hidden="true">◎</div>
+              <h3>Prepara tus ahorros</h3>
+              <p>Da de alta al menos una persona y un tipo de ahorro para registrar el primer movimiento.</p>
+              <div class="empty-actions">
+                <button class="button button-primary" data-open-dialog="people-dialog">Agregar persona</button>
+                <button class="button button-secondary" data-open-dialog="types-dialog">Agregar tipo</button>
+              </div>
+            </div>
+
+            <form id="transaction-form" class="transaction-form">
+              <fieldset class="movement-toggle">
+                <legend>Movimiento</legend>
+                <label class="toggle-option deposit-option">
+                  <input type="radio" name="kind" value="deposit" checked />
+                  <span><b aria-hidden="true">＋</b> Depósito</span>
+                </label>
+                <label class="toggle-option withdrawal-option">
+                  <input type="radio" name="kind" value="withdrawal" />
+                  <span><b aria-hidden="true">−</b> Retiro</span>
+                </label>
+                <label class="toggle-option transfer-option">
+                  <input type="radio" name="kind" value="transfer" />
+                  <span><b aria-hidden="true">⇄</b> Traspaso</span>
+                </label>
+              </fieldset>
+
+              <label class="field amount-field">
+                <span>Monto</span>
+                <div class="money-input"><span>$</span><input id="amount" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" required /></div>
+              </label>
+
+              <div class="field-row">
+                <label class="field">
+                  <span>Persona</span>
+                  <select id="transaction-person" name="person_id" required><option value="">Selecciona</option></select>
+                </label>
+                <label class="field">
+                  <span id="transaction-type-label">Tipo de ahorro</span>
+                  <select id="transaction-type" name="type_id" required><option value="">Selecciona</option></select>
+                </label>
+              </div>
+
+              <label id="transfer-destination-field" class="field hidden">
+                <span>Tipo de ahorro de destino</span>
+                <select id="transfer-destination" name="to_type_id"><option value="">Selecciona</option></select>
+                <small>El monto saldrá del tipo de origen y entrará al de destino.</small>
+              </label>
+
+              <label class="field">
+                <span>Fecha del movimiento</span>
+                <input id="occurred-at" name="occurred_at" type="date" required />
+                <small>Puedes cambiarla para registrar un movimiento anterior.</small>
+              </label>
+
+              <label class="field">
+                <span>Nota <em>Opcional</em></span>
+                <textarea id="note" name="note" rows="3" maxlength="240" placeholder="Ej. Ahorro semanal, colegiatura..."></textarea>
+              </label>
+
+              <button class="button button-primary button-wide" type="submit">
+                <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg> Guardar movimiento
+              </button>
+            </form>
+          </section>
+
+          <section class="content-stack">
+            <article class="panel totals-panel" aria-labelledby="totals-title">
+              <div class="panel-heading compact">
+                <div>
+                  <p class="eyebrow">DISTRIBUCIÓN</p>
+                  <h2 id="totals-title">Totales por persona y tipo</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Persona</th><th>Tipo de ahorro</th><th>Depósitos</th><th>Retiros</th><th>Saldo</th></tr></thead>
+                  <tbody id="breakdown-body"></tbody>
+                </table>
+                <div id="breakdown-empty" class="table-empty hidden">Los totales aparecerán cuando agregues movimientos.</div>
+              </div>
+            </article>
+
+            <article id="history-panel" class="panel history-panel" aria-labelledby="history-title">
+              <div class="panel-heading compact">
+                <div>
+                  <p class="eyebrow">HISTORIAL</p>
+                  <h2 id="history-title">Movimientos recientes</h2>
+                </div>
+                <span id="history-count" class="count-pill">0 registros</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Fecha</th><th>Persona</th><th>Tipo</th><th>Nota</th><th>Movimiento</th><th><span class="visually-hidden">Acciones</span></th></tr></thead>
+                  <tbody id="history-body"></tbody>
+                </table>
+                <div id="history-empty" class="table-empty hidden">Todavía no hay movimientos en esta vista.</div>
+              </div>
+            </article>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <dialog id="people-dialog">
+      <form method="dialog" class="dialog-card" data-catalog-form="people">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">CATÁLOGO</p><h2>Agregar persona</h2></div>
+          <button class="close-button" value="cancel" aria-label="Cerrar">×</button>
+        </div>
+        <p class="dialog-copy">Añade a cualquier integrante que tendrá ahorros individuales.</p>
+        <label class="field"><span>Nombre</span><input name="name" maxlength="80" autocomplete="off" placeholder="Ej. Ana" required /></label>
+        <div class="catalog-list" id="people-list"></div>
+        <button class="button button-primary button-wide" value="default">Guardar persona</button>
+      </form>
+    </dialog>
+
+    <dialog id="types-dialog">
+      <form method="dialog" class="dialog-card" data-catalog-form="types">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">CATÁLOGO</p><h2>Agregar tipo de ahorro</h2></div>
+          <button class="close-button" value="cancel" aria-label="Cerrar">×</button>
+        </div>
+        <p class="dialog-copy">Crea categorías como Emergencias, Vacaciones o Educación.</p>
+        <label class="field"><span>Nombre del tipo</span><input name="name" maxlength="80" autocomplete="off" placeholder="Ej. Fondo de emergencia" required /></label>
+        <div class="catalog-list" id="types-list"></div>
+        <button class="button button-primary button-wide" value="default">Guardar tipo de ahorro</button>
+      </form>
+    </dialog>
+
+    <dialog id="statement-dialog">
+      <form method="dialog" class="dialog-card" id="statement-form">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">DOCUMENTO PDF</p><h2>Generar estado de cuenta</h2></div>
+          <button class="close-button" value="cancel" aria-label="Cerrar">×</button>
+        </div>
+        <p class="dialog-copy">Elige el alcance. Si dejas las fechas vacías, el documento incluirá todo el historial.</p>
+        <div class="field-row">
+          <label class="field"><span>Persona</span><select id="statement-person" name="person_id"><option value="">Todas</option></select></label>
+          <label class="field"><span>Tipo de ahorro</span><select id="statement-type" name="type_id"><option value="">Todos</option></select></label>
+        </div>
+        <div class="field-row">
+          <label class="field"><span>Desde</span><input type="date" name="date_from" /></label>
+          <label class="field"><span>Hasta</span><input type="date" name="date_to" /></label>
+        </div>
+        <button class="button button-primary button-wide statement-button" value="default"><span aria-hidden="true">⇩</span> Descargar PDF</button>
+      </form>
+    </dialog>
+
+    <dialog id="delete-dialog" class="confirmation-dialog">
+      <form method="dialog" class="dialog-card confirmation-card">
+        <div class="dialog-handle" aria-hidden="true"></div>
+        <div class="confirmation-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>
+        </div>
+        <h2 id="delete-title">Eliminar movimiento</h2>
+        <p id="delete-message" class="dialog-copy">El saldo se actualizará inmediatamente.</p>
+        <div class="dialog-actions">
+          <button class="button button-secondary" value="cancel">Conservar</button>
+          <button id="confirm-delete" class="button button-danger" value="default">Sí, eliminar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <nav class="mobile-nav" aria-label="Navegación principal">
+      <button class="mobile-nav-item is-active" type="button" data-scroll-target="overview" aria-label="Ir al resumen">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm10 7h6V11h-6v9ZM4 20h6v-3H4v3Zm10-13h6V4h-6v3Z"/></svg><span>Resumen</span>
+      </button>
+      <button class="mobile-nav-item" type="button" data-scroll-target="entry-panel" aria-label="Agregar movimiento">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8m-4-4h8"/></svg><span>Nuevo</span>
+      </button>
+      <button class="mobile-nav-item" type="button" data-scroll-target="history-panel" aria-label="Ver movimientos">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg><span>Movimientos</span>
+      </button>
+      <button class="mobile-nav-item" type="button" data-open-dialog="statement-dialog" aria-label="Generar estado de cuenta">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7V3Z"/><path d="M15 3v5h5M10 13h6m-6 4h6"/></svg><span>Estado</span>
+      </button>
+    </nav>
+
+    <div id="toast-region" class="toast-region" aria-live="polite"></div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
