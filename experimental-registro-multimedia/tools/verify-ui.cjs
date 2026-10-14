@@ -102,6 +102,11 @@ async function main() {
     await page.locator("#save-item-btn").click();
     await page.locator("#item-dialog").waitFor({ state: "hidden" });
     assert.equal(saves, 3);
+    assert.equal(items.length, 142, "two new records must increase the total");
+    assert.equal(items.find(i => i.id === 28).title, "Registro 28", "new records must not overwrite the edited record");
+    assert.equal(items.find(i => i.id === 28).status, "finished");
+    assert.equal(items.filter(i => i.title === "Monster").length, 1);
+    assert.equal(items.filter(i => i.title === "Otro registro").length, 1);
     await page.locator('[data-view="stats"]').click();
     assert.equal(await page.locator(".stat").count(), 5);
     assert.equal(await page.locator("canvas").count(), 1);
