@@ -1,0 +1,21 @@
+services:
+  registro-multimedia:
+    build: .
+    container_name: registro-multimedia
+    restart: unless-stopped
+    ports:
+      - "3420:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_PATH: /app/server/data/registro.sqlite
+      UPLOAD_DIR: /app/server/uploads
+      # API keys opcionales para busqueda automatica.
+      # Tambien puedes dejarlas vacias y agregar registros manualmente.
+      TMDB_API_KEY: ""
+      RAWG_API_KEY: ""
+      GOOGLE_BOOKS_API_KEY: ""
+      COMICVINE_API_KEY: ""
+    volumes:
+      - ./server/data:/app/server/data
+      - ./server/uploads:/app/server/uploads

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f97316">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Registro">
+    <title>Registro multimedia</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/vendor/chart.umd.min.js" defer></script>
+    <script src="/config.js" defer></script>
+    <script src="/api-services.js" defer></script>
+    <script src="/vendor/lucide.min.js" defer></script>
+    <script src="/app.js" defer></script>
+  </head>
+  <body class="miestilo">
+    <div class="app-shell">
+      <header class="app-header">
+        <a class="brand" href="/" aria-label="Registro multimedia, inicio">
+          <img src="/icons/icon-192.png" width="40" height="40" alt="">
+          <span>Registro<span class="brand-subtitle">Multimedia</span></span>
+        </a>
+      </header>
+      <main id="app" class="content" tabindex="-1"></main>
+
+      <nav class="bottom-nav" aria-label="Navegación principal">
+        <button class="nav-item active" type="button" data-view="home" aria-current="page"><i data-lucide="house"></i><span>Inicio</span></button>
+        <button class="nav-item" type="button" data-view="library"><i data-lucide="library"></i><span>Biblioteca</span></button>
+        <button class="nav-item" type="button" data-view="pending"><i data-lucide="bookmark"></i><span>Pendientes</span></button>
+        <button class="nav-item" type="button" data-view="wishlist"><i data-lucide="heart"></i><span>Deseos</span></button>
+        <button class="nav-item" type="button" data-view="stats"><i data-lucide="chart-no-axes-combined"></i><span>Estadísticas</span></button>
+      </nav>
+    </div>
+    <button class="icon-button primary fab" id="open-add-btn" type="button" aria-label="Agregar registro" title="Agregar registro"><i data-lucide="plus"></i></button>
+
+    <dialog id="item-dialog" class="modal" aria-labelledby="modal-title">
+      <form id="item-form" class="modal-card" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow" id="modal-mode">Nuevo registro</p>
+            <h2 id="modal-title">Registro</h2>
+          </div>
+          <button class="icon-button ghost" type="button" data-close-modal aria-label="Cerrar" title="Cerrar"><i data-lucide="x"></i></button>
+        </div>
+
+        <input type="hidden" name="id" id="item-id">
+        <input type="hidden" name="source" id="source">
+        <input type="hidden" name="external_id" id="external_id">
+
+        <section class="form-section">
+          <label class="field span-2">
+            <span>Título *</span>
+            <input name="title" id="title" required autocomplete="off">
+          </label>
+          <label class="field">
+            <span>Categoría *</span>
+            <select name="category" id="category" required>
+              <option value="Película">Película</option>
+              <option value="Libro">Libro</option>
+              <option value="Videojuego">Videojuego</option>
+              <option value="Cómic">Cómic</option>
+              <option value="Manga">Manga</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Estado *</span>
+            <select name="status" id="status" required>
+              <option value="wishlist">Lista de deseos</option>
+              <option value="pending">Pendiente</option>
+              <option value="active">Actualmente</option>
+              <option value="finished">Terminado</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Año</span>
+            <input name="year" id="year" type="number" min="1800" max="2200" inputmode="numeric">
+          </label>
+        </section>
+
+        <section class="form-section">
+          <label class="field span-2">
+            <span>URL de portada</span>
+            <input name="cover_url" id="cover_url" type="url" placeholder="https://...">
+          </label>
+          <label class="field span-2">
+            <span>Subir portada</span>
+            <input name="cover_file" id="cover_file" type="file" accept="image/jpeg,image/png,image/webp">
+          </label>
+        </section>
+
+        <section class="form-section">
+          <label class="field">
+            <span>Géneros</span>
+            <input name="genres" id="genres" placeholder="Drama, aventura...">
+          </label>
+          <label class="field">
+            <span>Calificacion personal</span>
+            <select name="personal_rating" id="personal_rating">
+              <option value="">Sin calificar</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Fecha de finalizacion</span>
+            <input name="finished_date" id="finished_date" type="date">
+          </label>
+          <label class="field span-2">
+            <span>Notas personales</span>
+            <textarea name="notes" id="notes" rows="3"></textarea>
+          </label>
+        </section>
+
+        <div class="modal-actions">
+          <button class="button secondary" type="button" data-close-modal>Cancelar</button>
+          <button class="button primary" id="save-item-btn" type="submit">Guardar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="search-dialog" class="modal" aria-labelledby="search-heading">
+      <form id="search-form" class="modal-card" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Agregar registro</p>
+            <h2 id="search-heading">Buscar contenido</h2>
+          </div>
+          <button class="icon-button ghost" type="button" data-close-modal aria-label="Cerrar" title="Cerrar"><i data-lucide="x"></i></button>
+        </div>
+
+        <section class="search-box">
+          <div class="search-row">
+            <label class="field">
+              <span>Título</span>
+              <input id="search-title" name="search_title" placeholder="Escribe un título..." autocomplete="off">
+            </label>
+            <label class="field">
+              <span>Categoría</span>
+              <select id="search-category" name="search_category">
+                <option value="Película">Película</option>
+                <option value="Libro">Libro</option>
+                <option value="Videojuego">Videojuego</option>
+                <option value="Cómic">Cómic</option>
+                <option value="Manga">Manga</option>
+              </select>
+            </label>
+          </div>
+          <div class="modal-actions">
+            <button class="button secondary" type="button" data-open-manual>Agregar manualmente</button>
+            <button class="button primary" id="search-submit-btn" type="submit">Buscar</button>
+          </div>
+        </section>
+
+        <div id="modal-search-results" class="search-results"></div>
+      </form>
+    </dialog>
+
+    <dialog id="detail-dialog" class="modal" aria-labelledby="detail-title"></dialog>
+
+    <dialog id="confirm-dialog" class="modal compact-modal" aria-labelledby="confirm-title">
+      <form method="dialog" class="modal-card">
+        <h2 id="confirm-title"></h2>
+        <p id="confirm-message" class="muted"></p>
+        <div class="modal-actions">
+          <button class="button secondary" value="cancel">Cancelar</button>
+          <button class="button danger" value="confirm" id="confirm-action">Eliminar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

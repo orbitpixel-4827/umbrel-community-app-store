@@ -1,0 +1,28 @@
+manifestVersion: 1
+id: experimental-registro-multimedia
+name: Registro Multimedia
+tagline: Tu biblioteca personal de historias y juegos
+icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-registro-multimedia/public/icons/icon-512.png
+category: media
+version: "2.0.0"
+port: 3420
+description: >-
+  Organiza películas, libros, videojuegos, cómics y manga en una biblioteca privada.
+  Busca contenido en TMDB, RAWG, Open Library, Google Books, Gutendex, Comic Vine y AniList.
+  Guarda tus notas, calificaciones y fechas de finalización. Incluye estadísticas,
+  portadas propias y una interfaz diseñada para iPhone.
+  Los registros y las portadas se guardan en tu Umbrel con SQLite.
+developer: Experimental Labs
+website: https://github.com/orbitpixel-4827/umbrel-community-app-store
+submitter: Experimental Labs
+submission: https://github.com/orbitpixel-4827/umbrel-community-app-store
+repo: https://github.com/orbitpixel-4827/umbrel-community-app-store
+support: https://github.com/orbitpixel-4827/umbrel-community-app-store/issues
+gallery: []
+releaseNotes: >-
+  Rediseño MiEstilo, ícono para iPhone y acceso por IP local o Tailscale.
+  Biblioteca paginada, cinco categorías y compatibilidad con las bases de datos anteriores.
+dependencies: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""

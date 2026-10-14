@@ -1,0 +1,60 @@
+name: Build Registro Multimedia image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "experimental-registro-multimedia/**"
+      - ".github/workflows/registro-multimedia-image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: registro-multimedia-image
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experimental-registro-multimedia
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --prefix server --no-audit --no-fund
+      - name: Check sources and database compatibility
+        run: |
+          node --check public/app.js
+          node --check public/api-services.js
+          node --check server/server.js
+          node --test tests/database.test.js
+
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish for Intel and ARM
+        uses: docker/build-push-action@v6
+        with:
+          context: ./experimental-registro-multimedia
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/orbitpixel-4827/registro-multimedia:2.0.0
+          labels: |
+            org.opencontainers.image.title=Registro Multimedia
+            org.opencontainers.image.source=https://github.com/orbitpixel-4827/umbrel-community-app-store
+            org.opencontainers.image.version=2.0.0

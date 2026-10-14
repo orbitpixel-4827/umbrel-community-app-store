@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+server/data/*.sqlite
+server/data/*.sqlite-*
+server/uploads/*
+!server/data/.gitkeep
+!server/uploads/.gitkeep
+.verification/
+
