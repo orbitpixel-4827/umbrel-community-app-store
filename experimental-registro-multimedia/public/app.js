@@ -433,6 +433,8 @@ const App = (() => {
     const dialog = $("#item-dialog");
     const form = $("#item-form");
     form.reset();
+    // Hidden input values also update their defaults, so reset() alone keeps the last ID.
+    for (const name of ["id", "source", "external_id"]) form.elements[name].value = "";
     state.saving = false;
     state.formDirty = false;
     $("#save-item-btn").disabled = false;
