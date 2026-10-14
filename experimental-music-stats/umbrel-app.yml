@@ -1,0 +1,29 @@
+manifestVersion: 1
+id: experimental-music-stats
+name: Music Stats
+tagline: Tu historia musical, en tu servidor
+icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-music-stats/icon.png
+category: media
+version: "1.0.0"
+port: 3001
+description: >-
+  Estadísticas privadas de tu actividad musical con Last.fm y SQLite local.
+  Consulta el mes actual, compara periodos, descubre tus canciones, artistas
+  y álbumes favoritos y genera tu Wrapped privado. Incluye búsqueda global,
+  portadas almacenadas en caché e importación manual del historial completo.
+  La sincronización de reproducciones recientes se ejecuta cada 30 minutos.
+  Configura tu usuario y API Key de Last.fm desde Ajustes después de instalar.
+developer: Experimental Labs
+website: https://github.com/orbitpixel-4827/umbrel-community-app-store
+submitter: Experimental Labs
+submission: https://github.com/orbitpixel-4827/umbrel-community-app-store
+repo: https://github.com/orbitpixel-4827/umbrel-community-app-store/tree/main/experimental-music-stats
+support: https://github.com/orbitpixel-4827/umbrel-community-app-store/issues
+gallery: []
+releaseNotes: >-
+  Primera versión para la tienda. Interfaz MiEstilo clara y responsive,
+  navegación inferior en móvil, búsqueda accesible y errores visibles.
+dependencies: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""

@@ -1,0 +1,20 @@
+{
+  "name": "music-stats",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Private self-hosted music statistics dashboard powered by Last.fm and SQLite.",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
+    "build": "npm run build --workspace frontend",
+    "start": "npm run start --workspace backend",
+    "check": "npm run check --workspace backend && npm run build --workspace frontend"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
+

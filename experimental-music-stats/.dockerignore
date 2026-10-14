@@ -1,0 +1,14 @@
+node_modules
+frontend/dist
+data
+.env
+.git
+.DS_Store
+npm-debug.log*
+.cache
+artifacts
+umbrel
+scripts
+release
+*.tar.gz
+
