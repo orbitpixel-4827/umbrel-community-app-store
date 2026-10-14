@@ -6,6 +6,8 @@ La tienda ya está configurada y permanecerá vacía hasta que se añadan aplica
 
 ## Aplicaciones disponibles
 
+- **Registro Multimedia**: biblioteca privada de películas, libros, videojuegos, cómics y manga, con interfaz para iPhone y datos en SQLite.
+
 - **Ahorros Familiares**: depósitos, retiros, traspasos, filtros y estados de cuenta PDF.
 - **GraphicView**: análisis técnico visual para mercados.
 - **Pokédex**: reconocimiento y consulta personal de Pokémon.
