@@ -3,9 +3,12 @@ import base64
 import io
 import json
 import math
+import re
 import struct
 import threading
 import time
+import urllib.error
+import urllib.request
 import wave
 
 import core
@@ -42,17 +45,64 @@ def audible(pcm):
     return math.sqrt(sum(v*v for v in samples)/len(samples)) > 90
 
 
+def provider_problem(status, body=None, secret=''):
+    """Classify upstream failures without returning arbitrary provider text/secrets."""
+    if isinstance(body,(bytes,str)):
+        original=body.decode('utf-8',errors='replace') if isinstance(body,bytes) else body
+        try:body=json.loads(original[:32768])
+        except ValueError:body={'error':{'message':original}} if len(original)<500 and '<' not in original and '>' not in original else {}
+    error=body.get('error',{}) if isinstance(body,dict) else {}
+    code=error.get('code','') if isinstance(error,dict) else ''
+    detail=error.get('message','') if isinstance(error,dict) else error if isinstance(error,str) else ''
+    if not isinstance(detail,str):detail=''
+    if secret:detail=detail.replace(secret,'[clave oculta]')
+    detail=re.sub(r'(?i)sk-[a-z0-9_.*-]+|bearer\s+[^\s,;]+','[clave oculta]',detail)
+    detail=re.sub(r'[\x00-\x1f<>]',' ',detail).strip()[:250]
+    label=f'OpenAI · HTTP {status}. '
+    # Structured upstream reason helps diagnosis, but never echo HTML or credentials.
+    def problem(code,message):
+        return core.Problem(code,label+message+(' Detalle de OpenAI: '+detail if detail else ''))
+    if code in ('insufficient_quota','billing_hard_limit_reached','billing_not_active'):
+        return problem(429,'El proyecto de API no tiene cuota o saldo disponible. Revisa su facturación; ChatGPT Plus no incluye saldo de API.')
+    if status==401 or code in ('invalid_api_key','invalid_authentication','missing_api_key'):
+        return problem(401,'La API rechazó la autenticación. Comprueba que guardaste la clave completa del proyecto de OpenAI en Narración.')
+    if code in ('unsupported_country_region_territory','region_not_supported'):
+        return problem(403,'OpenAI no permite esta solicitud desde la región de salida de tu servidor. Revisa dónde sale a Internet Umbrel.')
+    if status==403:
+        return problem(403,'Acceso denegado a GPT-Live. Esto no demuestra que la clave sea incorrecta: los permisos All no habilitan el modelo para una cuenta o proyecto. Comprueba el acceso y nivel de API de ese proyecto; GPT-Live no admite el nivel gratuito.')
+    if status==404 or code=='model_not_found':
+        return problem(404,'GPT-Live no está disponible para este proyecto o modelo. Comprueba el acceso a gpt-live-1.')
+    if status==429 or code=='rate_limit_exceeded':
+        return problem(429,'Se alcanzó una cuota o límite de API. Revisa uso, límites y facturación del proyecto antes de repetir.')
+    return problem(502,'No se pudo completar la conexión de voz. La app no volverá a enviarla automáticamente.')
+
+
+def check_access(key):
+    """Read-only catalog check; not a promise of voice-session authorization."""
+    req=urllib.request.Request('https://api.openai.com/v1/models/'+MODEL,
+        headers={'Authorization':'Bearer '+key,'User-Agent':'Pokedex-Umbrel/1.4.1'})
+    try:
+        with core.OPENER.open(req,timeout=15) as response:
+            data=json.loads(response.read(65536))
+            if not isinstance(data,dict) or data.get('id')!=MODEL:
+                raise core.Problem(502,'OpenAI devolvió una comprobación de acceso no compatible.')
+    except urllib.error.HTTPError as exc:
+        raise provider_problem(exc.code,exc.read(32768),key) from None
+    except (urllib.error.URLError,TimeoutError):
+        raise core.Problem(503,'Umbrel no pudo consultar el acceso a la API de voz de OpenAI.') from None
+    except (ValueError,UnicodeError):
+        raise core.Problem(502,'OpenAI devolvió una comprobación de acceso incompleta.') from None
+    return {'ok':True,'message':'La API aceptó la clave y devolvió el modelo gpt-live-1. Esta consulta no verifica saldo ni autorización para abrir una sesión de voz. Probar voz comprobará la sesión; genera consumo si se abre. GPT-Live requiere un nivel de API compatible, aparte de ChatGPT Plus.'}
+
+
 def connect(key):
     # Imported only when used so offline data/tests do not need network packages.
     import websocket
     try:
         return websocket.create_connection('wss://api.openai.com/v1/live/sessions',
-            header={'Authorization': 'Bearer '+key}, timeout=5, redirect_limit=0)
+            header={'Authorization': 'Bearer '+key,'User-Agent':'Pokedex-Umbrel/1.4.1'}, timeout=10, redirect_limit=0, suppress_origin=True)
     except websocket.WebSocketBadStatusException as exc:
-        status = getattr(exc, 'status_code', 502)
-        if status in (401, 403): raise core.Problem(status, 'OpenAI no autorizó GPT-Live. Revisa la clave de API y su acceso al modelo.') from None
-        if status == 429: raise core.Problem(429, 'GPT-Live alcanzó la cuota de tu proyecto de API. Revisa uso y facturación en OpenAI.') from None
-        raise core.Problem(502, 'No se pudo abrir la voz de GPT-Live.') from None
+        raise provider_problem(getattr(exc,'status_code',502),getattr(exc,'resp_body',None),key) from None
     except Exception:
         raise core.Problem(503, 'Umbrel no pudo conectar con GPT-Live.') from None
 
@@ -111,9 +161,7 @@ def stream(text, voice, key, connector=connect, now=time.monotonic):
                 if not closing or last_voice is None: raise core.Problem(502, 'GPT-Live finalizó sin completar una narración.')
                 finalized = True; return
             elif kind == 'error':
-                code = str(event.get('error',{}).get('code',''))
-                if 'quota' in code or 'rate_limit' in code: raise core.Problem(429, 'GPT-Live alcanzó la cuota de API de OpenAI.')
-                raise core.Problem(502, 'GPT-Live rechazó la narración. Comprueba la clave y el acceso al modelo.')
+                raise provider_problem(502,event,key)
     except (ValueError, TypeError, KeyError):
         raise core.Problem(502, 'GPT-Live devolvió una respuesta no compatible.') from None
     finally:
