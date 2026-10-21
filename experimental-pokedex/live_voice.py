@@ -48,11 +48,12 @@ def audible(pcm):
 def provider_problem(status, body=None, secret=''):
     """Classify upstream failures without returning arbitrary provider text/secrets."""
     if isinstance(body,(bytes,str)):
-        try:body=json.loads(body[:32768])
-        except (ValueError,UnicodeError):body={}
+        original=body.decode('utf-8',errors='replace') if isinstance(body,bytes) else body
+        try:body=json.loads(original[:32768])
+        except ValueError:body={'error':{'message':original}} if len(original)<500 and '<' not in original and '>' not in original else {}
     error=body.get('error',{}) if isinstance(body,dict) else {}
     code=error.get('code','') if isinstance(error,dict) else ''
-    detail=error.get('message','') if isinstance(error,dict) else ''
+    detail=error.get('message','') if isinstance(error,dict) else error if isinstance(error,str) else ''
     if not isinstance(detail,str):detail=''
     if secret:detail=detail.replace(secret,'[clave oculta]')
     detail=re.sub(r'(?i)sk-[a-z0-9_.*-]+|bearer\s+[^\s,;]+','[clave oculta]',detail)

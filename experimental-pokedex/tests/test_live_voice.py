@@ -142,4 +142,11 @@ class DiagnosticTests(unittest.TestCase):
         self.assertIn('HTTP 403',exc.exception.message);self.assertIn('Voice session access denied',exc.exception.message)
         self.assertNotIn('fixture-secret',exc.exception.message)
 
+    def test_plain_voice_rejection_is_retained_without_a_secret(self):
+        error=live_voice.provider_problem(403,b'Voice session access denied: fixture-secret','fixture-secret')
+        self.assertIn('Voice session access denied',error.message);self.assertNotIn('fixture-secret',error.message)
+    def test_string_error_field_is_also_sanitized(self):
+        error=live_voice.provider_problem(403,{'error':'Voice session access denied: sk-proj-abc123'},'')
+        self.assertIn('Voice session access denied',error.message);self.assertNotIn('abc123',error.message)
+
 if __name__=='__main__':unittest.main()
