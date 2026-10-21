@@ -6,3 +6,5 @@
 !static/**
 !manage.py
 !chatgpt.py
+
+!live_voice.py

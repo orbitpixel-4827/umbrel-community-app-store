@@ -37,7 +37,7 @@ export async function pollJob(job,read,{signal,progress=()=>{},pause=ms=>new Pro
   if(result.state==='done')return result.result;
   if(result.state==='failed'){const error=Error(result.error);error.status=result.status;throw error;}
   if(result.state!=='working')throw Error('No se pudo consultar el progreso del escaneo.');
-  progress('Analizando…');await pause(1000);
+  progress('Analizando…');await pause(i<4?250:1000);
  }
  const error=Error('El análisis sigue pendiente. Puedes consultar su resultado sin reenviar la imagen.');error.job=job;throw error;
 }

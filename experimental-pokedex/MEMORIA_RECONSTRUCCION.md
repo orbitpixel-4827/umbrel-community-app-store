@@ -1,0 +1,54 @@
+# Pokédex Umbrel — memoria de reconstrucción
+
+Documento técnico sin credenciales. Mantenerlo actualizado al terminar cada cambio.
+
+## Alcance y ubicación
+
+Aplicación web/PWA personal para iPhone, alojada en Umbrel. El proyecto Android está separado y no debe modificarse al trabajar aquí. Carpeta de trabajo: `Pokedex Umbrel/`; código publicable: `repository/experimental-pokedex/`. Todos los archivos de desarrollo y temporales deben permanecer en el SSD externo.
+
+Repositorio y tienda comunitaria: https://github.com/orbitpixel-4827/umbrel-community-app-store . Identificador Umbrel: `experimental-pokedex`. No reconstruir otras apps de la tienda ni sobrescribir sus cambios.
+
+## Arquitectura
+
+- `server.py`: servidor HTTP Python multihilo, sesiones privadas, CSRF, SQLite y trabajos de reconocimiento consultables sin reenviar imágenes.
+- `core.py`: PokeAPI, fichas por videojuego, formas y transformaciones, estadísticas, defensas, movimientos, recursos e información complementaria.
+- `chatgpt.py`: conexión oficial con el plan de ChatGPT, renovación y verificación de tokens, catálogo de modelos y reconocimiento de imágenes. Credenciales exclusivamente en el volumen de Umbrel.
+- `static/app.mjs`: interfaz, navegación, cámara, fichas, colección, estadísticas, preferencias y audio. `domain.mjs`: reglas de presentación, formas, filtros, fórmulas y efecto robótico. `transport.mjs`: límites de espera, tratamiento de fallos y consulta de trabajos.
+- `static/assets/`: iconos, catálogo de videojuegos y tabla de tipos; conservar el icono de Pokédex para el acceso directo de iPhone.
+- `Dockerfile`, `docker-compose.yml`, `umbrel-app.yml`: imagen y registro en Umbrel. `.github/workflows/pokedex-image.yml`: pruebas y publicación multi arquitectura en GHCR.
+
+## Persistencia y seguridad
+
+Volumen `/data` en el contenedor, enlazado a `${APP_DATA_DIR}/data` en Umbrel. Base `pokedex.sqlite3` con WAL: encuentros, preferencias (incluidos favoritos), sesiones, cachés, blobs de audio/recursos y estado privado de proveedores. Mantener el volumen al actualizar. No copiar bases reales, contraseñas, claves, cookies, certificados privados ni archivos de conexión al repositorio o a esta memoria.
+
+Las exportaciones JSON de encuentros son compatibles con Android. No incluyen credenciales. Un encuentro tiene UUID, especie nacional, fecha, formato, origen y ficha con forma. Escaneos y altas son idempotentes: una reconexión no debe volver a consumir reconocimiento ni duplicar encuentros.
+
+## Experiencia que conservar
+
+Carcasa roja en inicio, interior claro, tarjetas redondeadas, etiquetas en cápsula, colores por tipo, iconos de contorno y hojas emergentes coherentes. Fichas desplazables: Ficha, Stats, Movimientos, Otros. Estadísticas por juego, métodos de aprendizaje, defensas y evoluciones. Formas conocidas con imagen; desconocidas en sombra y sin acceso a su información. Tipos y debilidades filtran la colección registrada. Audio automático únicamente después de un escaneo, nunca al abrir fichas manualmente. Efecto metálico local y reproducción algo acelerada.
+
+## Red e iPhone: regresiones que evitar
+
+HTTPS de confianza es necesario para vídeo en vivo; una foto es la alternativa en contexto no seguro. El navegador solo llama al mismo origen; Umbrel accede a proveedores. No fijar IP, hostname ni origen de Tailscale en el código. Respetar Host/Origin, sesión y CSRF. No interpretar errores de cuota o autenticación del proveedor como cierre de sesión de Pokédex.
+
+Safari conservaba una interfaz vieja mediante un service worker. Desde 1.3.2 no se instala un nuevo worker: `sw.js` solo retira cachés antiguas y se desregistra. Nunca devolver HTML de caché para `/api/*` o `/health`. La sesión y colección deben obtenerse del servidor; las cachés opcionales de audio no pueden bloquear arranque, ficha o reproducción. Liberar conexiones HTTP inactivas. Tras suspensión, recuperar datos sin destruir formularios, hojas o cámara.
+
+En iOS iniciar AudioContext dentro de un gesto del usuario, seleccionar sesión de audio `playback` y reanudar tras interrupciones de cámara o segundo plano. No depender de speechSynthesis del sistema.
+
+## Publicación y reconstrucción
+
+1. Recuperar el código del repositorio de la tienda, incluyendo datos estáticos y workflow.
+2. Ejecutar pruebas Python y Node del directorio `tests/` y comprobar sintaxis JavaScript. Las pruebas usan fixtures, nunca datos privados.
+3. Subir código y versión de imagen mediante GitHub. El workflow prueba y publica `ghcr.io/orbitpixel-4827/pokedex:<version>` para amd64 y arm64.
+4. Esperar construcción exitosa; obtener el digest real de la imagen. Solo después actualizar `docker-compose.yml` con etiqueta y digest y `umbrel-app.yml` con versión y notas.
+5. Conservar identificador, volumen, icono y puerto 9088. Verificar que `/health`, ajustes y manifiesto coincidan en versión. No anunciar disponible en la tienda antes de verificar publicación.
+
+## Versión 1.4.0 — 2026-10-21
+
+Implementados corazón activo rojo y filtro de favoritos; reconocimiento solo ChatGPT; narración GPT-Live progresiva sin caché bloqueante del navegador. `live_voice.py` controla sesiones y audio PCM, `static/audio-stream.mjs` decodifica la respuesta por fragmentos. El servidor guarda WAV únicamente tras completar la sesión. El filtro metálico conserva su estado entre fragmentos. Se detecta final mediante cola silenciosa porque Live no emite audio-done; duración máxima 55 segundos. No se usa micrófono. Las sesiones no se reintentan automáticamente. Las preferencias anteriores cambian de proveedor y voz sin borrar encuentros ni favoritos. GPT-Live requiere API de OpenAI con facturación independiente del plan ChatGPT, según documentación oficial. No reutilizar tokens del plan en endpoints de voz no autorizados.
+
+Fuentes oficiales: https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference y https://developers.openai.com/api/docs/guides/live y https://developers.openai.com/api/docs/guides/live-conversations .
+
+Pruebas de esta versión: 69 servidor/datos/HTTP, 11 conexión ChatGPT, 11 GPT-Live simulado, 4 migración y 81 JavaScript (176). Verificación visual en navegador interno con registros desechables: corazón rojo al guardar/quitar/volver a guardar, filtro de favoritos y ajustes con solo ChatGPT y GPT-Live. Sin prueba física de iPhone ni voz real con clave de API. No prometer latencia o fidelidad literal sin medir en dispositivo.
+
+Publicación 1.4.0 pendiente de comprobar la imagen y actualizar el manifiesto. Actualizar esta línea con PR, commit y digest al finalizar.

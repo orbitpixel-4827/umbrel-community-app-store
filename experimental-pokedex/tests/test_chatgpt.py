@@ -84,7 +84,7 @@ class ChatGPTTests(unittest.TestCase):
         app=server.App(self.store);ready=threading.Event();release=threading.Event()
         def recognize(*args):ready.set();release.wait(3);return {'candidates':[],'media':'otro'}
         data={'id':str(uuid.uuid4()),'operation':'recognize','input':{'image':base64.b64encode(b'\xff\xd8\xff'+b'x'*100).decode()}};self.store.set('openrouter_key','fixture-key')
-        with patch.object(core,'recognize',side_effect=recognize) as call:
+        with patch.object(chatgpt.Connection,'recognize',side_effect=recognize) as call:
             before=time.monotonic();started=app.start_job(data,'session');self.assertLess(time.monotonic()-before,.5);ready.wait(1)
             for _ in range(8):self.assertEqual(app.job(started['job'],'session')['state'],'working')
             self.assertEqual(app.start_job(data,'session'),started)
@@ -96,7 +96,7 @@ class ChatGPTTests(unittest.TestCase):
             self.assertEqual(app.job(started['job'],'session')['state'],'done');self.assertEqual(call.call_count,1)
     def test_provider_error_remains_distinct_inside_background_job(self):
         app=server.App(self.store);self.store.set('openrouter_key','fixture-key')
-        with patch.object(core,'recognize',side_effect=core.Problem(429,'Provider quota')):
+        with patch.object(chatgpt.Connection,'recognize',side_effect=core.Problem(429,'Provider quota')):
             result=app.start_job({'operation':'recognize','input':{'image':base64.b64encode(b'\xff\xd8\xff'+b'x'*100).decode()}},'session')
             for _ in range(100):
                 value=app.job(result['job'],'session')

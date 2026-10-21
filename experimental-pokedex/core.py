@@ -110,6 +110,9 @@ def fetch(url, payload=None, headers=None, limit=8*1024*1024):
         except Exception:
             data = {}
         host=urllib.parse.urlparse(url).hostname
+        if host == 'api.openai.com':
+            message='OpenAI no autorizó GPT-Live. Revisa la clave de API.' if e.code in (401,403) else 'GPT-Live no está disponible para tu proyecto de API.' if e.code==404 else 'OpenAI alcanzó su cuota de API; revisa uso y facturación.' if e.code==429 else 'OpenAI no completó la consulta de voz.'
+            raise Problem(e.code,message,retry_after=retry_delay(e.headers)) from None
         if host == 'generativelanguage.googleapis.com':
             raise Problem(e.code, google_error(e.code, data),retry_after=retry_delay(e.headers)) from None
         if host == 'openrouter.ai':
@@ -383,14 +386,14 @@ def defenses(types,generation=9):
 def narration(dex,game):
     versions=CATALOG['games'][game]['versions']
     description=next((d['text'] for v in versions for d in dex.get('descriptions',[]) if d['version']==v),dex.get('description',''))
-    if len(description)>750:
-        description=description[:750].rsplit('. ',1)[0]+'.'
+    if len(description)>340:
+        description=description[:340].rsplit('. ',1)[0]+'.'
     types=historical_types(dex,game)
     weak=', '.join(TYPES[t['type']] for t in defenses(types,CATALOG['games'][game]['generation']) if t['multiplier']>1)
     label=form_label(dex)
     text=f"{dex['name']}. {label+'. ' if label else ''}{dex.get('genus','Pokémon')}. {'Tipos originales' if kind(dex)=='terastal' else 'Tipo'} {' y '.join(TYPES.get(t,display(t)) for t in types)}. {description}"
     if weak: text+=f" {'Su forma original es débil' if kind(dex)=='terastal' else 'Es débil'} ante {weak}."
-    return text[:1600]
+    return text[:1000]
 
 def voice_payload(text,voice):
     if voice not in ('Charon','Kore','Puck'): raise Problem(400,'Voz inválida.')
