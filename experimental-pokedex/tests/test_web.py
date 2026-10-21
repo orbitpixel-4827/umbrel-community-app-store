@@ -236,7 +236,7 @@ class HTTPTests(WebTests):
                     if not data:break
                     received+=data
                 self.assertIn(b'200 OK',received)
-                self.assertIn(b'"version":"1.4.0"',received)
+                self.assertIn(b'"version":"1.4.1"',received)
     def test_http_csrf_and_cross_origin(self):
         self.auth();self.assertEqual(self.request('/api/settings',{'robot':False},csrf='bad')[0],403);self.assertEqual(self.request('/api/settings',{'robot':False},origin='https://evil.example')[0],403);self.assertEqual(self.request('/api/settings',{'robot':False})[0],200)
     def test_http_record_delete_export_and_restart_data(self):
@@ -245,7 +245,7 @@ class HTTPTests(WebTests):
         self.auth();entry=self.request('/api/encounters',{'lookup':'charmeleon'})[1];corrected=self.request('/api/encounters/'+entry['id'],{'lookup':'charizard-mega-x'})[1];self.assertEqual(corrected['at'],entry['at']);self.assertEqual(corrected['id'],entry['id']);self.assertEqual(corrected['species'],6)
     def test_http_google_401_does_not_log_out(self):
         self.auth();self.store.set('openai_voice_key','test-only-key')
-        with patch.object(core,'fetch_json',side_effect=core.Problem(401,'Google rechazó la autenticación.')):status,value,_=self.request('/api/check-access',{})
+        with patch.object(live_voice,'check_access',side_effect=core.Problem(401,'OpenAI rechazó la autenticación.')):status,value,_=self.request('/api/check-access',{})
         self.assertEqual(status,401);self.assertFalse(value['auth']);self.assertEqual(self.request('/api/bootstrap')[0],200)
     def test_http_scan_records_only_once_and_uses_provider_candidate(self):
         self.auth();self.store.set('openrouter_key','fixture-only-key')

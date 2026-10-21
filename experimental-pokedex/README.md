@@ -1,4 +1,4 @@
-# Pokédex para Umbrel · 1.4.0
+# Pokédex para Umbrel · 1.4.1
 
 ![Pokédex roja](icon.png)
 
@@ -90,10 +90,14 @@ También puedes generar copias completas de esta versión con `python manage.py 
 
 ## Publicación y validación
 
-La imagen `ghcr.io/orbitpixel-4827/pokedex:1.4.0` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
+La imagen `ghcr.io/orbitpixel-4827/pokedex:1.4.1` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
 
-La versión 1.4.0 pasa 178 pruebas (69 servidor/datos/HTTP, 11 ChatGPT, 11 GPT-Live simulado, 4 migración y 83 JavaScript). Las pruebas automáticas cubren persistencia, autenticación y renovación de ChatGPT, idempotencia de escaneos, recuperación de conexión, favoritos y reproducción progresiva. Usan proveedores simulados y no consumen cuota. La integración de GPT-Live requiere verificar la voz con una clave válida del propietario; no se presenta la simulación como una prueba real de voz.
+La versión 1.4.1 pasa 187 pruebas (69 servidor/datos/HTTP, 11 ChatGPT, 20 GPT-Live simulado, 4 migración y 83 JavaScript). Las pruebas automáticas cubren persistencia, autenticación y renovación de ChatGPT, idempotencia de escaneos, recuperación de conexión, favoritos y reproducción progresiva. Usan proveedores simulados y no consumen cuota. La integración de GPT-Live requiere verificar la voz con una clave válida del propietario; no se presenta la simulación como una prueba real de voz.
 
 La instalación real mediante Umbrel, su certificado y la cámara del iPhone deben verificarse en los dispositivos del propietario; estas pruebas no se presentan como verificación en un Umbrel real.
 
 Datos, imágenes y atribuciones: [NOTICES.md](NOTICES.md). No afiliada con Pokémon, Nintendo, Game Freak o Creatures.
+
+### Diagnóstico de apertura de voz (1.4.1)
+
+Comprobar acceso valida la clave mediante una consulta al catálogo; no garantiza autorización para abrir una sesión GPT-Live ni comprueba saldo. Probar voz es una operación distinta. Los permisos All de la clave no habilitan por sí solos un modelo para una cuenta. Ante un rechazo, la app presenta HTTP 401/403/429 y un motivo estructurado con credenciales ocultas; así distingue autenticación, permisos y cuotas. La conexión del servidor no envía Origin de navegador y no sigue redirecciones. La causa de una denegación real requiere revisar el detalle de esa sesión; esta versión no promete resolver restricciones externas de cuenta.

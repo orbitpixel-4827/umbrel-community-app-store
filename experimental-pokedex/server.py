@@ -298,9 +298,7 @@ class App:
             return entry
         if path=='/api/check-access':
             if not self.store.get('openai_voice_key'):raise core.Problem(400,'Configura una clave de API de OpenAI en Narración. GPT-Live no usa la suscripción ChatGPT.')
-            # Read-only check: do not open a billable voice session.
-            core.fetch_json('https://api.openai.com/v1/models/'+live_voice.MODEL,headers={'Authorization':'Bearer '+self.store.get('openai_voice_key')})
-            return {'ok':True,'message':'La clave de API tiene acceso a GPT-Live. La voz se factura aparte de ChatGPT; la prueba de voz sí genera audio.'}
+            return live_voice.check_access(self.store.get('openai_voice_key'))
         if path=='/api/voice':
             pcm=b''.join(self.voice_stream(body))
             return live_voice.wav_bytes(pcm),'audio/wav'
@@ -380,7 +378,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             parsed=urllib.parse.urlparse(self.path);path=parsed.path;query=urllib.parse.parse_qs(parsed.query)
-            if path=='/health':return self.reply(200,{'ok':True,'version':'1.4.0'})
+            if path=='/health':return self.reply(200,{'ok':True,'version':'1.4.1'})
             if path.startswith('/api/'):
                 session,csrf=self.session()
                 if path.startswith('/api/scan-jobs/'):
