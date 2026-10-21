@@ -16,7 +16,7 @@ VOICES = ('marin', 'cedar')
 RATE = 24000
 MAX_SECONDS = 55
 STYLE = ('Eres una enciclopedia electrónica. Habla en español de México, con dicción '
-         'precisa, ritmo ágil y voz monótona, metálica y robótica. Lee exclusivamente '
+         'precisa, ritmo algo más rápido de lo habitual y voz monótona, metálica y robótica. Lee exclusivamente '
          'la ficha proporcionada, sin saludo, preguntas ni comentarios adicionales. '
          'Al terminar, guarda silencio. No ejecutes herramientas ni delegues tareas.')
 

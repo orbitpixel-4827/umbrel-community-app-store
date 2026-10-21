@@ -54,7 +54,7 @@ El reconocimiento usa únicamente la conexión con tu plan de ChatGPT. Las imág
 
 En Ajustes → Narración introduce una **clave de API de OpenAI** por HTTPS de confianza. La voz usa `gpt-live-1` y tiene **facturación de API independiente de ChatGPT Plus**. No envíes la clave por chat. Se guarda en el volumen privado de Umbrel y nunca se devuelve al navegador, al repositorio o a la copia de encuentros. Las claves antiguas de otros proveedores ya no se utilizan.
 
-La narración es de una sola dirección: no solicita acceso al micrófono ni abre un chat interactivo. Reproduce audio PCM a medida que llega; no espera a que termine de generarse toda la ficha ni a escribir una caché de navegador. Mantiene el efecto metálico continuo entre paquetes y la reproducción 12 % más rápida. Solo se inicia automáticamente tras un escaneo. Las fichas abiertas manualmente requieren tocar Voz.
+La narración es de una sola dirección: no solicita acceso al micrófono ni abre un chat interactivo. Reproduce audio PCM a medida que llega; no espera a que termine de generarse toda la ficha ni a escribir una caché de navegador. Mantiene el efecto metálico continuo entre paquetes y solicita un ritmo ágil al modelo. Reproduce el flujo a su velocidad original para evitar silencios por consumir audio antes de que llegue. Solo se inicia automáticamente tras un escaneo. Las fichas abiertas manualmente requieren tocar Voz.
 
 El resumen hablado es breve; la ficha visual conserva toda su información. Los audios completados se guardan en Umbrel y se reutilizan sin abrir otra sesión de GPT-Live. La caché anterior de Gemini no se mezcla con las nuevas voces. No hay un límite diario local de narraciones, pero sí las cuotas del proyecto de API. Comprobar acceso consulta el modelo sin abrir una sesión de voz; Probar voz sí genera audio y consumo. Salir de la ficha cancela la reproducción y cierra la sesión; nunca se reintenta una sesión facturable automáticamente.
 
@@ -92,7 +92,7 @@ También puedes generar copias completas de esta versión con `python manage.py 
 
 La imagen `ghcr.io/orbitpixel-4827/pokedex:1.4.0` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
 
-La versión 1.4.0 pasa 176 pruebas (69 servidor/datos/HTTP, 11 ChatGPT, 11 GPT-Live simulado, 4 migración y 81 JavaScript). Las pruebas automáticas cubren persistencia, autenticación y renovación de ChatGPT, idempotencia de escaneos, recuperación de conexión, favoritos y reproducción progresiva. Usan proveedores simulados y no consumen cuota. La integración de GPT-Live requiere verificar la voz con una clave válida del propietario; no se presenta la simulación como una prueba real de voz.
+La versión 1.4.0 pasa 178 pruebas (69 servidor/datos/HTTP, 11 ChatGPT, 11 GPT-Live simulado, 4 migración y 83 JavaScript). Las pruebas automáticas cubren persistencia, autenticación y renovación de ChatGPT, idempotencia de escaneos, recuperación de conexión, favoritos y reproducción progresiva. Usan proveedores simulados y no consumen cuota. La integración de GPT-Live requiere verificar la voz con una clave válida del propietario; no se presenta la simulación como una prueba real de voz.
 
 La instalación real mediante Umbrel, su certificado y la cámara del iPhone deben verificarse en los dispositivos del propietario; estas pruebas no se presentan como verificación en un Umbrel real.
 

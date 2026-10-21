@@ -85,9 +85,9 @@ const audio={
   const buffer=this.ctx.createBuffer(1,samples.length,rate);
   if(robot&&!this.filter)this.filter=D.createRobotFilter(rate);
   buffer.copyToChannel(robot?this.filter(samples):samples,0);
-  const source=this.ctx.createBufferSource();source.buffer=buffer;source.playbackRate.value=1.12;source.connect(this.ctx.destination);
+  const source=this.ctx.createBufferSource();source.buffer=buffer;source.playbackRate.value=1;source.connect(this.ctx.destination);
   this.sources.add(source);source.onended=()=>{source.disconnect();this.sources.delete(source);};
-  const start=Math.max(this.ctx.currentTime+.04,this.nextTime);this.nextTime=start+samples.length/rate/1.12;source.start(start);
+  const start=Math.max(this.ctx.currentTime+.02,this.nextTime||this.ctx.currentTime+.16);this.nextTime=start+samples.length/rate;source.start(start);
  },
  async play(bytes,robot=true,speed=1.12,token=this.generation){
   if(token!==this.generation)return false;

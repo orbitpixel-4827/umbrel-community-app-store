@@ -20,7 +20,7 @@ function audioHarness(session={type:'auto'}){
   constructor(){contexts.push(this);order.push('context:'+session?.type);}
   async resume(){this.resumeCalls++;this.state='running';}
   createBuffer(channels,length,sampleRate){return {numberOfChannels:channels,length,sampleRate,copyToChannel(){},getChannelData(){return new Float32Array(length);}};}
-  createBufferSource(){const node={playbackRate:{value:1},connect(){},disconnect(){},start(){node.started=true;},stop(){node.stopped=true;}};this.sources.push(node);return node;}
+  createBufferSource(){const node={playbackRate:{value:1},connect(){},disconnect(){},start(when){node.started=true;node.when=when;},stop(){node.stopped=true;}};this.sources.push(node);return node;}
   async decodeAudioData(){return this.createBuffer(1,240,24000);}
  }
  const scope={window:{AudioContext:Context},navigator:session?{audioSession:session}:{},D,...time};
@@ -71,4 +71,18 @@ test('the scanner retries when Safari has not supplied its first video frame yet
 });
 test('an audio activation error does not block the live camera',async()=>{
  const h=cameraHarness();h.scope.lastScan=0;h.scope.audio.unlock=async()=>{throw Error('audio bloqueado');};await h.scope.openCamera();await h.time.advance(3500);assert.equal(h.analyses.length,1);assert.ok(h.messages.includes('audio bloqueado'));
+});
+
+test('live PCM preserves continuous playback timing without consuming future packets early',async()=>{
+ const h=audioHarness();await h.audio.unlock();h.audio.ctx.currentTime=1;
+ await h.audio.pcm(new Float32Array(4800),24000,true,h.audio.generation);
+ const first=[...h.audio.sources][0];assert.equal(first.playbackRate.value,1);assert.equal(first.when,1.16);
+ h.audio.ctx.currentTime=1.2;await h.audio.pcm(new Float32Array(4800),24000,true,h.audio.generation);
+ const second=[...h.audio.sources][1];assert.ok(Math.abs(second.when-1.36)<.00001);
+});
+test('leaving a detail aborts its voice stream and stops all scheduled audio packets',async()=>{
+ const h=audioHarness();await h.audio.unlock();h.audio.ctx.currentTime=0;
+ await h.audio.pcm(new Float32Array(2400),24000,true,h.audio.generation);
+ const node=[...h.audio.sources][0];let aborted=false;h.audio.streamController={abort(){aborted=true;}};
+ h.audio.stop();assert.equal(aborted,true);assert.equal(node.stopped,true);assert.equal(h.audio.sources.size,0);assert.equal(h.audio.filter,null);
 });
