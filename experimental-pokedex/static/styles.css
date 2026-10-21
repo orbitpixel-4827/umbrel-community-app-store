@@ -3,3 +3,5 @@
 .photo-prompt{display:grid;place-items:center;gap:22px;width:100%;height:100%;color:#b7e0d1;font-size:18px;font-weight:600}.photo-prompt svg{width:78px;height:78px;stroke-width:1.3}
 
 .offline{min-height:44px;touch-action:manipulation;cursor:pointer;pointer-events:auto}
+
+.favorite.is-favorite{color:#d32f4c!important;background:#fff0f3}.favorite.is-favorite svg{fill:currentColor;stroke:currentColor}.favorite[aria-pressed="true"]:focus-visible{outline-color:#d32f4c}

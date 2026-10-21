@@ -19,11 +19,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import core
 import chatgpt
+import live_voice
 
 ROOT=Path(__file__).resolve().parent
 SESSION_COOKIE=os.environ.get('POKEDEX_COOKIE_NAME','pokedex_session')
 if not re.fullmatch(r'[A-Za-z0-9_]{1,64}',SESSION_COOKIE):raise RuntimeError('Nombre de cookie inválido.')
-DEFAULTS={'provider':'openrouter','voice':'Charon','autoVoice':True,'robot':True,'game':'scarlet-violet','favorites':[]}
+DEFAULTS={'provider':'chatgpt','voice':'marin','autoVoice':True,'robot':True,'game':'scarlet-violet','favorites':[]}
 
 def dumps(value): return json.dumps(value,ensure_ascii=False,separators=(',',':'))
 def password_hash(password,salt): return hashlib.scrypt(password.encode(),salt=salt,n=16384,r=8,p=1,maxmem=64*1024*1024).hex()
@@ -76,7 +77,9 @@ class Store:
         with self.lock: return [json.loads(r[0]) for r in self.db.execute('SELECT body FROM encounters ORDER BY at DESC,id DESC')]
     def settings(self):
         out=dict(DEFAULTS,**self.get('preferences',{}))
-        out.update(hasGemini=bool(self.get('gemini_key')),hasOpenrouter=bool(self.get('openrouter_key')),hasVoice=bool(self.get('voice_key') or self.get('gemini_key')))
+        out['provider']='chatgpt'
+        if out['voice'] not in live_voice.VOICES:out['voice']='marin'
+        out.update(hasVoice=bool(self.get('openai_voice_key')),voiceEngine='gpt-live-1')
         connection=self.get('chatgpt_connection') or {}
         out['chatgpt']={'connected':bool(connection.get('refresh_token')),'email':connection.get('email',''),'model':connection.get('model','')}
         out['chatgptModels']=self.get('chatgpt_models',[])
@@ -86,7 +89,7 @@ class Store:
         with self.lock:
             row=self.db.execute('SELECT day,count,last,pause FROM quotas WHERE kind=?',(kind,)).fetchone()
             count=row[1] if row and row[0]==day else 0
-            if row and now<row[3]: raise core.Problem(429,f'{dict(chatgpt="ChatGPT",openrouter="OpenRouter").get(kind.removeprefix("vision:"),"Gemini")} está en pausa tras limitar las solicitudes. Espera {int(row[3]-now)+1} segundos antes de volver a probar.')
+            if row and now<row[3]: raise core.Problem(429,f'{dict(chatgpt="ChatGPT").get(kind.removeprefix("vision:"),"GPT-Live")} está en pausa tras limitar las solicitudes. Espera {int(row[3]-now)+1} segundos antes de volver a probar.')
             if limit is not None and count>=limit: raise core.Problem(429,f'Pokédex alcanzó su límite local de {limit} solicitudes de {"voz" if kind=="voice" else "reconocimiento"} por hoy.')
             if row and now-row[2]<gap: raise core.Problem(429,f'Espera {int(gap-(now-row[2]))+1} segundos antes de repetir.')
             self.db.execute('INSERT OR REPLACE INTO quotas VALUES (?,?,?,?,?)',(kind,day,count+1,now,row[3] if row else 0))
@@ -152,7 +155,7 @@ class Store:
 
 class App:
     def __init__(self,store):
-        self.store=store;self.data=core.Data(store);self.chatgpt=chatgpt.Connection(store);self.login_attempts={};self.login_lock=threading.Lock();self.jobs={};self.jobs_lock=threading.Lock()
+        self.store=store;self.data=core.Data(store);self.chatgpt=chatgpt.Connection(store);self.login_attempts={};self.login_lock=threading.Lock();self.jobs={};self.jobs_lock=threading.Lock();self.voice_lock=threading.Lock()
     def start_job(self,body,session):
         operation=body.get('operation');data=body.get('input')
         if operation not in ('recognize','encounters') or not isinstance(data,dict):raise core.Problem(400,'Operación de escaneo inválida.')
@@ -213,7 +216,7 @@ class App:
                 if k in body:
                     if not isinstance(body[k],bool): raise core.Problem(400,'Preferencia inválida.')
                     out[k]=body[k]
-            for k,allowed in (('provider',('chatgpt','gemini','openrouter')),('voice',('Charon','Kore','Puck')),('game',core.CATALOG['games'])):
+            for k,allowed in (('provider',('chatgpt',)),('voice',live_voice.VOICES),('game',core.CATALOG['games'])):
                 if k in body:
                     if body[k] not in allowed: raise core.Problem(400,'Opción inválida.')
                     out[k]=body[k]
@@ -222,7 +225,7 @@ class App:
                 if not isinstance(favorites,list) or len(favorites)>2000 or any(not isinstance(i,int) or not 0<i<10000 for i in favorites): raise core.Problem(400,'Favoritos inválidos.')
                 out['favorites']=sorted(set(favorites))
             keys={}
-            for k in ('gemini_key','openrouter_key','voice_key'):
+            for k in ('openai_voice_key',):
                 if body.get('clear_'+k): keys[k]=''
                 elif body.get(k):
                     value=body[k]
@@ -246,25 +249,17 @@ class App:
             return {'ok':True}
         if path=='/api/import': return {'inserted':self.store.import_backup(body)}
         if path=='/api/check-recognition':
-            provider=self.store.settings()['provider'];key=self.store.get(provider+'_key')
-            if provider=='chatgpt':
-                models=self.chatgpt.models()
-                return {'provider':'chatgpt','daily':None,'models':models,'message':'Conectado a tu plan de ChatGPT. No se envió una imagen ni se consumió un reconocimiento. Se aplican los límites de uso compartido de tu suscripción.'}
-            if provider!='chatgpt' and not key: raise core.Problem(400,'Configura la clave de reconocimiento en Ajustes.')
-            return core.recognition_access(provider,key)
+            models=self.chatgpt.models()
+            return {'provider':'chatgpt','daily':None,'models':models,'message':'Conectado a tu plan de ChatGPT. No se envió una imagen ni se consumió un reconocimiento. Se aplican los límites de tu suscripción.'}
         if path=='/api/recognize':
             image=body.get('image','')
             if not isinstance(image,str) or len(image)>2*1024*1024: raise core.Problem(413,'La imagen es demasiado grande.')
             try: raw=base64.b64decode(image,validate=True)
             except ValueError: raise core.Problem(400,'Imagen inválida.') from None
             if not raw.startswith(b'\xff\xd8\xff') or len(raw)<100: raise core.Problem(400,'Selecciona una imagen JPEG válida.')
-            provider=self.store.settings()['provider'];key=self.store.get(provider+'_key')
-            if provider!='chatgpt' and not key: raise core.Problem(400,'Configura la clave de reconocimiento en Ajustes.')
-            # A provider's quota or cooldown must not block the other provider.
-            # Ignore the old shared daily cap without deleting saved user data.
-            scope='vision:'+provider
+            scope='vision:chatgpt'
             self.store.reserve(scope,None,20)
-            try: result=self.chatgpt.recognize(image) if provider=='chatgpt' else core.recognize(image,provider,key)
+            try: result=self.chatgpt.recognize(image)
             except core.Problem as e:
                 if e.status==429:self.store.pause(scope,e.retry_after or 60)
                 raise
@@ -302,27 +297,39 @@ class App:
             with self.store.lock: self.store.db.execute('UPDATE encounters SET species=?,body=? WHERE id=?',(entry['species'],dumps(entry),identity))
             return entry
         if path=='/api/check-access':
-            key=self.store.get('voice_key') or self.store.get('gemini_key')
-            if not key: raise core.Problem(400,'Configura la clave de voz en Ajustes.')
-            core.fetch_json('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1',headers={'x-goog-api-key':key})
-            core.fetch_json('https://generativelanguage.googleapis.com/v1beta/models/'+core.VOICE_MODEL,headers={'x-goog-api-key':key})
-            return {'ok':True,'message':'La clave y el modelo de voz están disponibles. La generación aún depende de tu cuota.'}
+            if not self.store.get('openai_voice_key'):raise core.Problem(400,'Configura una clave de API de OpenAI en Narración. GPT-Live no usa la suscripción ChatGPT.')
+            # Read-only check: do not open a billable voice session.
+            core.fetch_json('https://api.openai.com/v1/models/'+live_voice.MODEL,headers={'Authorization':'Bearer '+self.store.get('openai_voice_key')})
+            return {'ok':True,'message':'La clave de API tiene acceso a GPT-Live. La voz se factura aparte de ChatGPT; la prueba de voz sí genera audio.'}
         if path=='/api/voice':
-            game=body.get('game',self.store.settings()['game'])
-            if game not in core.CATALOG['games']: raise core.Problem(400,'Videojuego inválido.')
-            dex=self.selected_dex(body);text=core.narration(dex,game);voice=self.store.settings()['voice']
-            cache_key='voice:'+hashlib.sha256((core.VOICE_MODEL+'|'+voice+'|'+text).encode()).hexdigest()
-            cached=self.store.blob(cache_key)
-            if cached:return cached
-            key=self.store.get('voice_key') or self.store.get('gemini_key')
-            if not key: raise core.Problem(400,'Configura tu clave de Gemini en Narración.')
-            self.store.reserve('voice',40,5)
-            try: raw=core.voice_response(core.fetch_json('https://generativelanguage.googleapis.com/v1beta/interactions',core.voice_payload(text,voice),{'x-goog-api-key':key}))
-            except core.Problem as e:
-                if e.status==429:self.store.pause('voice',e.retry_after or 60)
-                raise
-            self.store.save_blob(cache_key,raw,'audio/wav');return raw,'audio/wav'
+            pcm=b''.join(self.voice_stream(body))
+            return live_voice.wav_bytes(pcm),'audio/wav'
         raise core.Problem(404,'La opción no existe.')
+
+    def voice_stream(self,body):
+        game=body.get('game',self.store.settings()['game'])
+        if game not in core.CATALOG['games']:raise core.Problem(400,'Videojuego inválido.')
+        dex=self.selected_dex(body);text=core.narration(dex,game);voice=self.store.settings()['voice']
+        cache_key='voice:'+hashlib.sha256((live_voice.MODEL+'|'+live_voice.REVISION+'|'+voice+'|'+text).encode()).hexdigest()
+        cached=self.store.blob(cache_key)
+        if cached:
+            yield live_voice.pcm_bytes(cached[0]);return
+        key=self.store.get('openai_voice_key')
+        if not key:raise core.Problem(400,'Configura una clave de API de OpenAI en Narración. La voz de GPT-Live tiene facturación aparte de ChatGPT.')
+        if not self.voice_lock.acquire(blocking=False):raise core.Problem(409,'Ya hay una narración en curso.')
+        try:
+            # A second listener may arrive just after the first clip was saved.
+            cached=self.store.blob(cache_key)
+            if cached:yield live_voice.pcm_bytes(cached[0]);return
+            self.store.reserve('voice:live',None,1)
+            chunks=[];size=0
+            for pcm in live_voice.stream(text,voice,key):
+                size+=len(pcm)
+                if size>live_voice.RATE*2*live_voice.MAX_SECONDS:raise core.Problem(502,'La narración excedió la duración permitida.')
+                chunks.append(pcm);yield pcm
+            if not chunks:raise core.Problem(502,'GPT-Live no devolvió audio.')
+            self.store.save_blob(cache_key,live_voice.wav_bytes(b''.join(chunks)),'audio/wav')
+        finally:self.voice_lock.release()
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version='HTTP/1.1'
@@ -373,7 +380,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             parsed=urllib.parse.urlparse(self.path);path=parsed.path;query=urllib.parse.parse_qs(parsed.query)
-            if path=='/health':return self.reply(200,{'ok':True,'version':'1.3.2'})
+            if path=='/health':return self.reply(200,{'ok':True,'version':'1.4.0'})
             if path.startswith('/api/'):
                 session,csrf=self.session()
                 if path.startswith('/api/scan-jobs/'):
@@ -418,12 +425,35 @@ class Handler(BaseHTTPRequestHandler):
             session,csrf=self.session()
             if not hmac.compare_digest(self.headers.get('X-Pokedex-CSRF',''),csrf):raise core.Problem(403,'La sesión cambió. Vuelve a abrir Pokédex.')
             if path=='/api/chatgpt/import' and scheme!='https':raise core.Problem(400,'La conexión de ChatGPT solo se importa por HTTPS con un certificado de confianza.')
+            if path=='/api/settings' and body.get('openai_voice_key') and scheme!='https':raise core.Problem(400,'Guarda la clave de voz mediante HTTPS de confianza.')
+            if path=='/api/voice-stream':return self.reply_voice(body)
             result=self.app.post(path,body,session)
             if isinstance(result,tuple):return self.reply(200,result[0],result[1])
             return self.reply(200,result,headers={'Set-Cookie':SESSION_COOKIE+'=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'} if path=='/api/logout' else None)
         except core.Problem as e:self.reply(e.status,{'error':e.message,'auth':e.auth})
         except (ValueError,KeyError,TypeError):self.reply(400,{'error':'Solicitud inválida.'})
         except Exception:self.reply(500,{'error':'No se pudo completar la operación. Comprueba el historial antes de repetir.'})
+    def reply_voice(self,body):
+        stream=self.app.voice_stream(body)
+        try:first=next(stream)
+        except StopIteration:raise core.Problem(502,'No se recibió audio.')
+        self.send_response(200);self.send_header('Content-Type','application/x-ndjson')
+        self.send_header('Cache-Control','no-store');self.send_header('X-Accel-Buffering','no')
+        self.send_header('X-Content-Type-Options','nosniff');self.send_header('Connection','close');self.end_headers()
+        self.close_connection=True
+        def emit(event):self.wfile.write((dumps(event)+'\n').encode());self.wfile.flush()
+        try:
+            emit({'type':'audio','rate':live_voice.RATE,'pcm':base64.b64encode(first).decode()})
+            for pcm in stream:emit({'type':'audio','rate':live_voice.RATE,'pcm':base64.b64encode(pcm).decode()})
+            emit({'type':'done'})
+        except (BrokenPipeError,ConnectionResetError,TimeoutError):pass
+        except core.Problem as exc:
+            try:emit({'type':'error','message':exc.message})
+            except OSError:pass
+        except Exception:
+            try:emit({'type':'error','message':'La narración se interrumpió. Puedes probar de nuevo con Voz.'})
+            except OSError:pass
+        finally:stream.close()
     def do_DELETE(self):
         try:
             self.origin();session,csrf=self.session()

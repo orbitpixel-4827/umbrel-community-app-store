@@ -1,6 +1,6 @@
-// Retire the cached interface for clients installed before 1.3.2.
+// Retire the cached interface for clients installed before 1.4.0.
 // New clients load directly from Umbrel and do not register a worker.
-const RELEASE='1.3.2';
+const RELEASE='1.4.0';
 self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
  const keys=await caches.keys();

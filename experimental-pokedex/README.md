@@ -1,4 +1,4 @@
-# Pokédex para Umbrel · 1.3.2
+# Pokédex para Umbrel · 1.4.0
 
 ![Pokédex roja](icon.png)
 
@@ -28,7 +28,7 @@ El asistente imprime una dirección para abrir en **el navegador interno de Code
 
 El archivo de conexión contiene credenciales: no lo publiques ni lo envíes por chat. Después de importarlo, Umbrel debe encargarse de la renovación. Para desconectar, usa Ajustes; para revocar también el permiso en OpenAI, hazlo en los ajustes de ChatGPT. Pokédex distingue ambas acciones. Elige entre los modelos ofrecidos por tu cuenta uno que admita imágenes.
 
-El reconocimiento usa la suscripción de ChatGPT y sus límites de uso compartido. No se garantiza uso ilimitado ni disponibilidad para todas las cuentas. No hay cambio automático a una API de pago. La narración continúa usando Gemini; el acceso al plan de ChatGPT no sustituye esa voz.
+El reconocimiento usa la suscripción de ChatGPT y sus límites de uso compartido. No se garantiza uso ilimitado ni disponibilidad para todas las cuentas. No hay cambio automático a una API de pago. La narración utiliza GPT-Live y una clave de API de OpenAI independiente. El plan de ChatGPT no incluye esa API de voz; su consumo se factura por separado.
 
 Flujo implementado según la [documentación oficial de SIWC](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [servidores remotos](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms) y [entrada de imágenes](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
 
@@ -48,7 +48,21 @@ En Ajustes → Comprobar conexión se comprueba el servidor y la disponibilidad 
 
 Los encuentros, ajustes, claves de reconocimiento/voz y caché viven en **la carpeta de datos de esta app en Umbrel**, bajo `data/`. Se conservan al reiniciar y actualizar; también admiten la gestión de almacenamiento de umbrelOS 2.0.
 
-Introduce las claves de Gemini/OpenRouter en Ajustes. No se incluyen claves, contraseñas del propietario ni bases personales en este repositorio o imagen. Las fotos del escaneo se envían al proveedor seleccionado para identificarlas; no se conserva la foto original en el historial. Las cuotas gratuitas del proveedor no son ilimitadas. Pokédex no añade un tope diario de reconocimiento. Mantiene un intervalo mínimo de 20 segundos entre análisis por proveedor y 40 narraciones nuevas por día UTC. Las pausas tras un error de cuota son independientes para Gemini, OpenRouter y ChatGPT; la app respeta el tiempo de espera indicado por el servicio cuando está disponible. Los contadores antiguos de 20 análisis ya no bloquean al actualizar. En Ajustes → Reconocimiento → Comprobar acceso puedes ver las solicitudes gratuitas usadas, el límite diario y las restantes que OpenRouter informa para tu cuenta. Si el servicio no facilita el contador, se indica sin inventar una cifra. Gemini permite comprobar el acceso al modelo; su cuota se consulta en AI Studio. Una consulta de ficha o la reproducción de audio ya guardado no utiliza una nueva solicitud de IA. Los errores de cuota se muestran en pantalla; no activan servicios de pago.
+El reconocimiento usa únicamente la conexión con tu plan de ChatGPT. Las imágenes se envían a OpenAI para identificarlas y no se conservan como fotos en el historial. Se mantienen los límites de tu suscripción y el intervalo de 20 segundos entre análisis; no hay un tope diario añadido por Pokédex ni reenvío automático de imágenes.
+
+### Narración con GPT-Live
+
+En Ajustes → Narración introduce una **clave de API de OpenAI** por HTTPS de confianza. La voz usa `gpt-live-1` y tiene **facturación de API independiente de ChatGPT Plus**. No envíes la clave por chat. Se guarda en el volumen privado de Umbrel y nunca se devuelve al navegador, al repositorio o a la copia de encuentros. Las claves antiguas de otros proveedores ya no se utilizan.
+
+La narración es de una sola dirección: no solicita acceso al micrófono ni abre un chat interactivo. Reproduce audio PCM a medida que llega; no espera a que termine de generarse toda la ficha ni a escribir una caché de navegador. Mantiene el efecto metálico continuo entre paquetes y la reproducción 12 % más rápida. Solo se inicia automáticamente tras un escaneo. Las fichas abiertas manualmente requieren tocar Voz.
+
+El resumen hablado es breve; la ficha visual conserva toda su información. Los audios completados se guardan en Umbrel y se reutilizan sin abrir otra sesión de GPT-Live. La caché anterior de Gemini no se mezcla con las nuevas voces. No hay un límite diario local de narraciones, pero sí las cuotas del proyecto de API. Comprobar acceso consulta el modelo sin abrir una sesión de voz; Probar voz sí genera audio y consumo. Salir de la ficha cancela la reproducción y cierra la sesión; nunca se reintenta una sesión facturable automáticamente.
+
+GPT-Live no emite un evento de final de turno de audio. La app termina la sesión tras una cola silenciosa, con límites de tiempo y tamaño. No puede garantizar lectura literal ni una latencia fija: dependen del modelo y de la red. Se verifica el cierre de sesión antes de guardar el audio completo.
+
+### Favoritos
+
+El corazón se rellena de rojo después de guardar correctamente. En Colección, el botón de corazón muestra solo los favoritos registrados; vuelve a tocarlo para ver todos. Se combina con el filtro por tipo y la búsqueda. Los favoritos siguen guardados en las preferencias privadas de Umbrel.
 
 ## Trasladar los datos de Docker Compose
 
@@ -76,9 +90,9 @@ También puedes generar copias completas de esta versión con `python manage.py 
 
 ## Publicación y validación
 
-La imagen `ghcr.io/orbitpixel-4827/pokedex:1.3.2` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
+La imagen `ghcr.io/orbitpixel-4827/pokedex:1.4.0` se construye en GitHub Actions para `linux/amd64` y `linux/arm64`; el Compose instalado usa el digest de esa imagen. No requiere compilación en Umbrel ni Docker en la computadora del desarrollador.
 
-Pasaron 66 pruebas de servidor y datos, 11 de autorización/renovación de ChatGPT y trabajos privados, 72 de lógica JavaScript y 4 de migración completa (153 en total). Los tests automáticos simulan los proveedores. Además, el propietario autorizó el acceso oficial a su plan: se verificó la autorización real y, en el navegador interno con un servidor de prueba, ChatGPT reconoció dos imágenes consecutivas de Cyndaquil y Charmeleon, que quedaron guardados como dos encuentros distintos. Esta prueba confirma el flujo con esas imágenes; no constituye una evaluación general de precisión. Se verificaron también las cookies separadas, el origen HTTPS con las cabeceras del proxy y la conservación de encuentros, claves y contraseña en una copia de prueba.
+La versión 1.4.0 pasa 176 pruebas (69 servidor/datos/HTTP, 11 ChatGPT, 11 GPT-Live simulado, 4 migración y 81 JavaScript). Las pruebas automáticas cubren persistencia, autenticación y renovación de ChatGPT, idempotencia de escaneos, recuperación de conexión, favoritos y reproducción progresiva. Usan proveedores simulados y no consumen cuota. La integración de GPT-Live requiere verificar la voz con una clave válida del propietario; no se presenta la simulación como una prueba real de voz.
 
 La instalación real mediante Umbrel, su certificado y la cámara del iPhone deben verificarse en los dispositivos del propietario; estas pruebas no se presentan como verificación en un Umbrel real.
 

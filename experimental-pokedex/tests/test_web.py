@@ -18,6 +18,8 @@ import wave
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
+import live_voice
+import chatgpt
 import core
 import server
 
@@ -87,7 +89,7 @@ class WebTests(unittest.TestCase):
         row=self.row();row['at']=int(time.time()*1000)+2*86400000
         with self.assertRaises(core.Problem):self.store.import_backup(self.backup([row]))
     def test_settings_do_not_expose_keys(self):
-        self.store.set('gemini_key','test-only-not-a-real-key');settings=self.store.settings();self.assertTrue(settings['hasGemini']);self.assertNotIn('test-only-not-a-real-key',json.dumps(settings));self.assertNotIn('gemini_key',settings)
+        self.store.set('openai_voice_key','test-only-not-a-real-key');settings=self.store.settings();self.assertTrue(settings['hasVoice']);self.assertNotIn('test-only-not-a-real-key',json.dumps(settings));self.assertNotIn('gemini_key',settings)
     def test_quota_durable_after_restart(self):
         self.store.reserve('vision',20,20)
         with self.assertRaises(core.Problem):self.store.reserve('vision',20,20)
@@ -103,37 +105,30 @@ class WebTests(unittest.TestCase):
         self.store.set('openrouter_key','fixture-key')
         day=time.strftime('%Y-%m-%d',time.gmtime())
         self.store.db.execute('INSERT INTO quotas VALUES (?,?,?,?,?)',('vision',day,20,time.time(),time.time()+86400))
-        with patch.object(core,'recognize',return_value={'candidates':[],'media':'otro'}) as recognize:
+        with patch.object(chatgpt.Connection,'recognize',return_value={'candidates':[],'media':'otro'}) as recognize:
             self.assertIn('ticket',self.scan());self.assertEqual(recognize.call_count,1)
         self.assertEqual(len(self.store.entries()),1)
     def test_recognition_does_not_add_daily_cap(self):
         self.store.set('openrouter_key','fixture-key')
         day=time.strftime('%Y-%m-%d',time.gmtime())
-        self.store.db.execute('INSERT INTO quotas VALUES (?,?,?,?,?)',('vision:openrouter',day,1000,0,0))
-        with patch.object(core,'recognize',return_value={'candidates':[],'media':'otro'}):self.scan()
-        self.assertEqual(self.store.db.execute('SELECT count FROM quotas WHERE kind=?',('vision:openrouter',)).fetchone()[0],1001)
-    def test_provider_failure_does_not_pause_other_provider(self):
-        self.store.set('gemini_key','fixture-google');self.store.set('openrouter_key','fixture-openrouter')
-        self.store.set('preferences',{'provider':'gemini'})
-        with patch.object(core,'recognize',side_effect=core.Problem(429,'Gemini quota',retry_after=120)):
-            with self.assertRaises(core.Problem):self.scan()
-        with patch.object(core,'recognize',return_value={'candidates':[],'media':'otro'}) as recognize:
-            with self.assertRaises(core.Problem) as error:self.scan()
-            self.assertIn('Gemini',error.exception.message);self.assertEqual(recognize.call_count,0)
-            self.store.set('preferences',{'provider':'openrouter'});self.scan();self.assertEqual(recognize.call_count,1)
-        pause=self.store.db.execute('SELECT pause FROM quotas WHERE kind=?',('vision:gemini',)).fetchone()[0]
-        self.assertGreater(pause-time.time(),119)
+        self.store.db.execute('INSERT INTO quotas VALUES (?,?,?,?,?)',('vision:chatgpt',day,1000,0,0))
+        with patch.object(chatgpt.Connection,'recognize',return_value={'candidates':[],'media':'otro'}):self.scan()
+        self.assertEqual(self.store.db.execute('SELECT count FROM quotas WHERE kind=?',('vision:chatgpt',)).fetchone()[0],1001)
+    def test_removed_provider_preferences_migrate_without_erasing_collection(self):
+        self.store.record(self.dex(),'imagen','manual',str(uuid.uuid4()))
+        self.store.set('preferences',{'provider':'gemini','voice':'Charon','favorites':[5],'robot':False})
+        settings=self.store.settings()
+        self.assertEqual(settings['provider'],'chatgpt');self.assertEqual(settings['voice'],'marin')
+        self.assertEqual(settings['favorites'],[5]);self.assertFalse(settings['robot']);self.assertEqual(len(self.store.entries()),1)
+        with self.assertRaises(core.Problem):server.App(self.store).post('/api/settings',{'provider':'openrouter'},'fixture-session')
     def test_recognition_cooldown_persists_after_restart_without_daily_cap(self):
-        self.store.reserve('vision:openrouter',None,20)
+        self.store.reserve('vision:chatgpt',None,20)
         self.store.db.close();self.store=server.Store(self.temp.name)
-        with self.assertRaises(core.Problem):self.store.reserve('vision:openrouter',None,20)
-    def test_openrouter_quota_query_returns_only_safe_counters_and_no_inference(self):
-        self.store.set('openrouter_key','fixture-secret-key')
-        raw={'data':{'label':'fixture-secret-key','limit_remaining':123,'free_model_daily_requests':{'used':11,'limit':50,'remaining':39,'private':'fixture-secret-key'}}}
-        with patch.object(core,'fetch_json',return_value=raw) as fetcher:
+        with self.assertRaises(core.Problem):self.store.reserve('vision:chatgpt',None,20)
+    def test_recognition_check_uses_only_chatgpt_and_no_inference(self):
+        with patch.object(chatgpt.Connection,'models',return_value=[{'slug':'fixture','name':'Fixture'}]) as models:
             result=server.App(self.store).post('/api/check-recognition',{},'fixture-session')
-        self.assertEqual(result['daily'],{'used':11,'limit':50,'remaining':39});self.assertNotIn('fixture-secret-key',json.dumps(result))
-        self.assertEqual(fetcher.call_count,1);self.assertEqual(fetcher.call_args.args,('https://openrouter.ai/api/v1/key',))
+        self.assertIsNone(result['daily']);self.assertEqual(result['provider'],'chatgpt');self.assertEqual(models.call_count,1)
         self.assertEqual(self.store.db.execute('SELECT count(*) FROM quotas').fetchone()[0],0)
     def test_openrouter_missing_or_invalid_counter_is_not_invented(self):
         for quota in (None,{}, {'used':0,'limit':50,'remaining':True}, {'used':0,'limit':50,'remaining':-1}):
@@ -241,7 +236,7 @@ class HTTPTests(WebTests):
                     if not data:break
                     received+=data
                 self.assertIn(b'200 OK',received)
-                self.assertIn(b'"version":"1.3.2"',received)
+                self.assertIn(b'"version":"1.4.0"',received)
     def test_http_csrf_and_cross_origin(self):
         self.auth();self.assertEqual(self.request('/api/settings',{'robot':False},csrf='bad')[0],403);self.assertEqual(self.request('/api/settings',{'robot':False},origin='https://evil.example')[0],403);self.assertEqual(self.request('/api/settings',{'robot':False})[0],200)
     def test_http_record_delete_export_and_restart_data(self):
@@ -249,14 +244,14 @@ class HTTPTests(WebTests):
     def test_http_correct_keeps_date_and_id(self):
         self.auth();entry=self.request('/api/encounters',{'lookup':'charmeleon'})[1];corrected=self.request('/api/encounters/'+entry['id'],{'lookup':'charizard-mega-x'})[1];self.assertEqual(corrected['at'],entry['at']);self.assertEqual(corrected['id'],entry['id']);self.assertEqual(corrected['species'],6)
     def test_http_google_401_does_not_log_out(self):
-        self.auth();self.store.set('voice_key','test-only-key')
+        self.auth();self.store.set('openai_voice_key','test-only-key')
         with patch.object(core,'fetch_json',side_effect=core.Problem(401,'Google rechazó la autenticación.')):status,value,_=self.request('/api/check-access',{})
         self.assertEqual(status,401);self.assertFalse(value['auth']);self.assertEqual(self.request('/api/bootstrap')[0],200)
     def test_http_scan_records_only_once_and_uses_provider_candidate(self):
         self.auth();self.store.set('openrouter_key','fixture-only-key')
         result={'candidates':[{'id':5,'slug':'charmeleon','certainty':'high','transformation':'none','teraType':''}],'media':'peluche'}
         image=base64.b64encode(b'\xff\xd8\xff'+b'fixture-image'*30).decode()
-        with patch.object(core,'recognize',return_value=result):
+        with patch.object(chatgpt.Connection,'recognize',return_value=result):
             status,scan,_=self.request('/api/recognize',{'image':image})
         self.assertEqual(status,200);self.assertEqual(self.store.entries(),[])
         status,entry,_=self.request('/api/encounters',{'ticket':scan['ticket'],'candidate':0,'lookup':'charizard-mega-x'})
@@ -266,7 +261,7 @@ class HTTPTests(WebTests):
         self.auth();self.store.set('openrouter_key','fixture-only-key')
         result={'candidates':[{'id':5,'slug':'charmeleon','certainty':'high','transformation':'none','teraType':''}],'media':'peluche'}
         image=base64.b64encode(b'\xff\xd8\xff'+b'fixture-image'*30).decode();identity=str(uuid.uuid4())
-        with patch.object(core,'recognize',return_value=result) as recognize:
+        with patch.object(chatgpt.Connection,'recognize',return_value=result) as recognize:
             status,started,_=self.request('/api/scan-jobs',{'id':identity,'operation':'recognize','input':{'image':image}});self.assertEqual(status,200)
             for _ in range(100):
                 value=self.request('/api/scan-jobs/'+started['job'])[1]
@@ -348,8 +343,24 @@ class HTTPTests(WebTests):
         self.auth();good=self.row();bad=self.row();bad['species']=99;status,_,_=self.request('/api/import',self.backup([good,bad]));self.assertEqual(status,400);self.assertEqual(self.store.entries(),[])
     def test_http_asset_ssrf_block(self):
         self.auth();self.assertEqual(self.request('/api/asset?url='+urllib.parse.quote('http://127.0.0.1/secrets'))[0],400)
+    def test_http_voice_stream_requires_auth_and_csrf_and_flushes_pcm(self):
+        self.assertEqual(self.request('/api/voice-stream',{'lookup':'charmeleon'})[0],401)
+        self.auth();self.assertEqual(self.request('/api/voice-stream',{'lookup':'charmeleon'},csrf='bad')[0],403)
+        self.store.set('openai_voice_key','fixture-key')
+        with patch.object(live_voice,'stream',return_value=iter([b'\x00\x20'*240])):
+            status,raw,headers=self.request('/api/voice-stream',{'lookup':'charmeleon'})
+        self.assertEqual(status,200);self.assertEqual(headers.get_content_type(),'application/x-ndjson')
+        events=[json.loads(line) for line in raw.splitlines()]
+        self.assertEqual(events[0]['type'],'audio');self.assertEqual(events[0]['rate'],24000);self.assertEqual(events[-1]['type'],'done')
+        self.assertNotIn(b'fixture-key',raw)
+    def test_http_voice_key_cannot_be_saved_over_plain_http(self):
+        self.auth();status,_,_=self.request('/api/settings',{'openai_voice_key':'fixture-secret'})
+        self.assertEqual(status,400);self.assertIsNone(self.store.get('openai_voice_key'))
+    def test_http_voice_failure_before_audio_is_readable_json(self):
+        self.auth();status,result,_=self.request('/api/voice-stream',{'lookup':'charmeleon'})
+        self.assertEqual(status,400);self.assertFalse(result['auth']);self.assertIn('GPT-Live',result['error'])
     def test_http_voice_binary_cache_without_key_request(self):
-        self.auth();dex=self.dex();text=core.narration(dex,'scarlet-violet');key='voice:'+__import__('hashlib').sha256((core.VOICE_MODEL+'|Charon|'+text).encode()).hexdigest();self.store.save_blob(key,b'cached-wav','audio/wav');status,raw,headers=self.request('/api/voice',{'lookup':'charmeleon','game':'scarlet-violet'});self.assertEqual(status,200);self.assertEqual(raw,b'cached-wav');self.assertEqual(headers.get_content_type(),'audio/wav')
+        self.auth();dex=self.dex();text=core.narration(dex,'scarlet-violet');key='voice:'+__import__('hashlib').sha256((live_voice.MODEL+'|'+live_voice.REVISION+'|marin|'+text).encode()).hexdigest();raw=live_voice.wav_bytes(b'\x00\x00'*240);self.store.save_blob(key,raw,'audio/wav');status,raw,headers=self.request('/api/voice',{'lookup':'charmeleon','game':'scarlet-violet'});self.assertEqual(status,200);self.assertTrue(raw.startswith(b'RIFF'));self.assertEqual(headers.get_content_type(),'audio/wav')
 
 if __name__=='__main__':
     suite=unittest.TestSuite()
