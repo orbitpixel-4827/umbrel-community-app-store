@@ -5,7 +5,7 @@ services:
       APP_HOST: experimental-pokedex_web_1
       APP_PORT: 8765
   web:
-    image: ghcr.io/orbitpixel-4827/pokedex:1.4.0@sha256:0b1753be0bc56fa9357bbb6b6a25d4c7ed68fe9f711a6734930223a7629a134f
+    image: ghcr.io/orbitpixel-4827/pokedex:1.4.1@sha256:353d390b7ccd86935298a4a74b0f2c17fc43d398889f79a97f0a4d026f4cb4e7
     user: "1000:1000"
     init: true
     restart: on-failure
