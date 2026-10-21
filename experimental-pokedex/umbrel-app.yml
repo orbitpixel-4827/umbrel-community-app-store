@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: ai
 name: Pokédex
-version: "1.4.0"
+version: "1.4.1"
 tagline: Escanea, descubre y consulta tus Pokémon
 icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-pokedex/icon.png
 requiresHttps: true
@@ -27,14 +27,14 @@ description: >-
   copia JSON de la app anterior. Las claves y la contraseña no se incluyen en esa
   copia; la guía del paquete explica cómo trasladar también la base completa.
 releaseNotes: >-
-  El corazón de favoritos ahora se rellena de rojo y Colección permite filtrar
-  solo favoritos junto con búsqueda y tipo. Reconocimiento conserva únicamente
-  ChatGPT. La voz utiliza GPT-Live con audio progresivo y efecto metálico continuo;
-  comienza a reproducirse mientras llega, con un resumen más breve y ritmo ágil.
-  Solo habla automáticamente después de escanear. Necesita una clave de API de
-  OpenAI en Narración, con facturación aparte de ChatGPT Plus. Reutiliza audios
-  completados sin abrir otra sesión. Conserva encuentros, favoritos y conexión
-  con ChatGPT. Incluye memoria técnica de reconstrucción sin datos sensibles.
+  Distingue el rechazo de autenticación, los permisos del proyecto y las cuotas
+  al abrir la voz de GPT-Live. Muestra el código HTTP y el motivo del proveedor
+  ocultando las credenciales, en una ventana que permanece visible para leerlo.
+  Comprobar acceso aclara que consultar el catálogo no verifica la apertura de
+  una sesión de voz ni el saldo de API. Ajusta la conexión del servidor para
+  omitir el origen de navegador y mantener las redirecciones bloqueadas.
+  Conserva registros, favoritos, ajustes y la clave guardada. Las restricciones
+  externas de una cuenta o proyecto requieren comprobar el motivo informado.
 
 developer: Experimental Labs
 website: https://github.com/orbitpixel-4827/umbrel-community-app-store
