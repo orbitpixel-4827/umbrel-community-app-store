@@ -80,6 +80,13 @@ function AssetIcon({ asset, size = 'small' }: { asset: Asset; size?: 'small' | '
   return <span className={`asset-dot ${size}`} style={{ background: asset.color }}><Icon {...props} /></span>;
 }
 
+function ColorControl({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const apply = (next: string) => { if (/^#[0-9a-f]{6}$/i.test(next)) onChange(next); };
+  return <span className="color-control"><input aria-label={`${label}: selector de color`} type="color" value={value} onInput={(event) => apply(event.currentTarget.value)} onChange={(event) => apply(event.currentTarget.value)} /><input aria-label={`${label}: código hexadecimal`} className="color-hex" value={draft} maxLength={7} spellCheck={false} onChange={(event) => { setDraft(event.target.value); apply(event.target.value); }} onBlur={() => setDraft(value)} /></span>;
+}
+
 export default function Home() {
   const [symbol, setSymbol] = useState('BTCUSD');
   const [timeframe, setTimeframe] = useState('1D');
@@ -93,6 +100,7 @@ export default function Home() {
   const [showStudies, setShowStudies] = useState(true);
   const [studiesLocked, setStudiesLocked] = useState(false);
   const [favoritesOpen, setFavoritesOpen] = useState(true);
+  const [mobileFavoritesOpen, setMobileFavoritesOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [indicatorMenu, setIndicatorMenu] = useState(false);
@@ -121,6 +129,31 @@ export default function Home() {
   const dragRef = useRef<{ id: number; anchor: DataPoint; originalStart: DataPoint; originalEnd: DataPoint; originalThird?: DataPoint } | null>(null);
   const resizeRef = useRef<{ id: number; kind: Drawing['kind']; startClientX: number; initialFontSize: number } | null>(null);
   const requestRef = useRef(0);
+  const panelActive = settingsOpen || indicatorMenu || assetMenu || mobileFavoritesOpen;
+  const closePanels = () => { setSettingsOpen(false); setIndicatorMenu(false); setAssetMenu(false); setMobileFavoritesOpen(false); };
+  const openPanel = (panel: 'settings' | 'indicators' | 'assets' | 'favorites') => {
+    closePanels();
+    if (panel === 'settings') setSettingsOpen(!settingsOpen);
+    if (panel === 'indicators') setIndicatorMenu(!indicatorMenu);
+    if (panel === 'assets') setAssetMenu(!assetMenu);
+    if (panel === 'favorites') setMobileFavoritesOpen(!mobileFavoritesOpen);
+  };
+  useEffect(() => {
+    if (!panelActive) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const panel = document.querySelector<HTMLElement>('[data-app-panel]');
+    const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]') ?? []).filter(el => el.getClientRects().length);
+    focusable()[0]?.focus();
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); closePanels(); }
+      if (event.key !== 'Tab') return;
+      const items = focusable(), first = items[0], last = items[items.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !panel?.contains(document.activeElement))) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || !panel?.contains(document.activeElement))) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', keydown);
+    return () => { document.removeEventListener('keydown', keydown); if (previous?.isConnected) previous.focus(); };
+  }, [settingsOpen, indicatorMenu, assetMenu, mobileFavoritesOpen, panelActive]);
 
   const asset = catalog.find((item) => item.symbol === symbol) ?? INITIAL_ASSETS[0];
   const candles = market.candles.length ? market.candles : FALLBACK;
@@ -478,37 +511,39 @@ export default function Home() {
   } : null;
 
   return (
-    <main className="app-shell" style={{ '--chart-bg': colors.background } as React.CSSProperties}>
+    <main className="app-shell miestilo-dark" style={{ '--chart-bg': colors.background } as React.CSSProperties}>
+      {panelActive && <button className="panel-backdrop" aria-label="Cerrar panel" tabIndex={-1} onClick={closePanels} />}
       <header className="topbar">
         <div className="brand"><span className="brand-mark"><BarChart3 size={18} /></span><span>GraphicView</span></div>
         <div className="asset-picker-wrap">
-          <button className="asset-picker" onClick={() => setAssetMenu(!assetMenu)}><AssetIcon asset={asset} size="medium" /><span><strong>{symbol}</strong><small>{market.name || asset.name}</small></span><ChevronDown size={16} /></button>
-          {assetMenu && <div className="asset-menu">
-            <label><Search size={15} /><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar acciones, ETF o índices" /></label>
+          <button className="asset-picker" onClick={() => openPanel('assets')} aria-expanded={assetMenu} aria-label="Seleccionar activo"><AssetIcon asset={asset} size="medium" /><span><strong>{symbol}</strong><small>{market.name || asset.name}</small></span><ChevronDown size={16} /></button>
+          {assetMenu && <div className="asset-menu" data-app-panel role="dialog" aria-modal="true" aria-label="Seleccionar activo"><div className="panel-heading"><span>Explorar mercados</span><button className="panel-close" aria-label="Cerrar búsqueda" onClick={closePanels}><X size={18} /></button></div>
+            <label><Search size={15} /><input aria-label="Buscar acciones, ETF o índices" autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar acciones, ETF o índices" /></label>
             <div className="asset-results">{searching && <p className="menu-status">Buscando…</p>}{!searching && visibleAssets.map((item) => <div className="asset-result" key={item.symbol}><button onClick={() => chooseAsset(item)}><AssetIcon asset={item} /><span><strong>{item.symbol}</strong><small>{item.name} · {item.exchange ?? item.category}</small></span></button><button className={favorites.includes(item.symbol) ? 'starred' : ''} onClick={() => setFavorites((list) => list.includes(item.symbol) ? list.filter((id) => id !== item.symbol) : [...list, item.symbol])} aria-label="Agregar o quitar favorito"><Star size={16} fill={favorites.includes(item.symbol) ? 'currentColor' : 'none'} /></button></div>)}</div>
           </div>}
         </div>
         <nav className="timeframes" aria-label="Marco temporal">{['4H', '1D', '1S'].map((item) => <button key={item} className={timeframe === item ? 'active' : ''} aria-pressed={timeframe === item} onClick={() => { setCrosshair(null); setTimeframe(item); }}>{item}</button>)}</nav>
         <div className="top-actions">
-          <button className="action-button" onClick={() => setIndicatorMenu(!indicatorMenu)}><LineChart size={17} /><span>Indicadores</span><b>{indicators.length}</b></button>
+          <button className="icon-button mobile-favorites-toggle" onClick={() => openPanel('favorites')} aria-label="Favoritos" aria-expanded={mobileFavoritesOpen}><Star size={18} /></button>
+          <button className="action-button" onClick={() => openPanel('indicators')} aria-expanded={indicatorMenu} aria-label="Indicadores"><LineChart size={17} /><span>Indicadores</span><b>{indicators.length}</b></button>
           <button className={`icon-button ${!showStudies ? 'active' : ''}`} onClick={() => setShowStudies(!showStudies)} aria-label="Mostrar u ocultar dibujos">{showStudies ? <Eye size={18} /> : <EyeOff size={18} />}</button>
           <button className={`icon-button ${studiesLocked ? 'active' : ''}`} onClick={toggleStudiesLock} aria-label={studiesLocked ? 'Desbloquear dibujos e indicadores' : 'Bloquear dibujos e indicadores'} title={studiesLocked ? 'Desbloquear dibujos e indicadores' : 'Bloquear dibujos e indicadores'}>{studiesLocked ? <Lock size={18} /> : <Unlock size={18} />}</button>
-          <button className="icon-button" onClick={() => setSettingsOpen(!settingsOpen)} aria-label="Apariencia"><Palette size={18} /></button>
+          <button className="icon-button" onClick={() => openPanel('settings')} aria-expanded={settingsOpen} aria-label="Apariencia"><Palette size={18} /></button>
         </div>
-        {indicatorMenu && <div className="floating-panel indicators-panel"><div className="panel-heading"><span>Indicadores</span></div>{INDICATORS.map((item) => <div className={`indicator-row ${selectedIndicator === item.id ? 'current' : ''}`} key={item.id}><button disabled={studiesLocked} onClick={() => { setSelectedIndicator(item.id); if (!indicators.includes(item.id)) setIndicators((list) => [...list, item.id]); }}><span style={{ background: indicatorStyles[item.id]?.color ?? item.color }} />{item.label}</button><button disabled={studiesLocked} className={indicators.includes(item.id) ? 'visible-toggle' : ''} onClick={() => setIndicators((list) => list.includes(item.id) ? list.filter((id) => id !== item.id) : [...list, item.id])} aria-label={`${indicators.includes(item.id) ? 'Ocultar' : 'Mostrar'} ${item.label}`}>{indicators.includes(item.id) ? <Eye size={15} /> : <EyeOff size={15} />}</button></div>)}{!studiesLocked && selectedIndicator && selectedIndicatorStyle && <div className="indicator-editor"><strong>{INDICATORS.find((item) => item.id === selectedIndicator)?.label}</strong><label>Color <input type="color" value={selectedIndicatorStyle.color} onChange={(event) => setIndicatorStyles((styles) => ({ ...styles, [selectedIndicator]: { ...styles[selectedIndicator], color: event.target.value } }))} /></label><label>Opacidad <input type="range" min="10" max="100" value={Math.round(selectedIndicatorStyle.opacity * 100)} onChange={(event) => setIndicatorStyles((styles) => ({ ...styles, [selectedIndicator]: { ...styles[selectedIndicator], opacity: Number(event.target.value) / 100 } }))} /><output>{Math.round(selectedIndicatorStyle.opacity * 100)}%</output></label><label>Grosor <input type="range" min="1" max="8" step=".5" value={selectedIndicatorStyle.width} onChange={(event) => setIndicatorStyles((styles) => ({ ...styles, [selectedIndicator]: { ...styles[selectedIndicator], width: Number(event.target.value) } }))} /><output>{selectedIndicatorStyle.width}px</output></label></div>}</div>}
-        {settingsOpen && <div className="floating-panel settings-panel"><div className="panel-heading"><span>Apariencia</span><small>Guardado local</small></div><label>Vela alcista<input type="color" value={colors.up} onChange={(event) => setColors({ ...colors, up: event.target.value })} /></label><label>Vela bajista<input type="color" value={colors.down} onChange={(event) => setColors({ ...colors, down: event.target.value })} /></label><label>Fondo del gráfico<input type="color" value={colors.background} onChange={(event) => setColors({ ...colors, background: event.target.value })} /></label></div>}
+        {indicatorMenu && <div className="floating-panel indicators-panel" data-app-panel role="dialog" aria-modal="true" aria-label="Indicadores"><div className="panel-heading"><span>Indicadores</span><button className="panel-close" aria-label="Cerrar indicadores" onClick={closePanels}><X size={18} /></button></div>{INDICATORS.map((item) => <div className={`indicator-row ${selectedIndicator === item.id ? 'current' : ''}`} key={item.id}><button disabled={studiesLocked} onClick={() => { setSelectedIndicator(item.id); if (!indicators.includes(item.id)) setIndicators((list) => [...list, item.id]); }}><span style={{ background: indicatorStyles[item.id]?.color ?? item.color }} />{item.label}</button><button disabled={studiesLocked} className={indicators.includes(item.id) ? 'visible-toggle' : ''} onClick={() => setIndicators((list) => list.includes(item.id) ? list.filter((id) => id !== item.id) : [...list, item.id])} aria-label={`${indicators.includes(item.id) ? 'Ocultar' : 'Mostrar'} ${item.label}`}>{indicators.includes(item.id) ? <Eye size={15} /> : <EyeOff size={15} />}</button></div>)}{!studiesLocked && selectedIndicator && selectedIndicatorStyle && <div className="indicator-editor"><strong>{INDICATORS.find((item) => item.id === selectedIndicator)?.label}</strong><label>Color <input type="color" value={selectedIndicatorStyle.color} onChange={(event) => setIndicatorStyles((styles) => ({ ...styles, [selectedIndicator]: { ...styles[selectedIndicator], color: event.target.value } }))} /></label><label>Opacidad <input type="range" min="10" max="100" value={Math.round(selectedIndicatorStyle.opacity * 100)} onChange={(event) => setIndicatorStyles((styles) => ({ ...styles, [selectedIndicator]: { ...styles[selectedIndicator], opacity: Number(event.target.value) / 100 } }))} /><output>{Math.round(selectedIndicatorStyle.opacity * 100)}%</output></label><label>Grosor <input type="range" min="1" max="8" step=".5" value={selectedIndicatorStyle.width} onChange={(event) => setIndicatorStyles((styles) => ({ ...styles, [selectedIndicator]: { ...styles[selectedIndicator], width: Number(event.target.value) } }))} /><output>{selectedIndicatorStyle.width}px</output></label></div>}</div>}
+        {settingsOpen && <div className="floating-panel settings-panel" data-app-panel role="dialog" aria-modal="true" aria-label="Apariencia"><div className="panel-heading"><span>Apariencia</span><button className="panel-close" aria-label="Cerrar apariencia" onClick={closePanels}><X size={18} /></button></div><div className="appearance-row"><span>Vela alcista</span><ColorControl label="Vela alcista" value={colors.up} onChange={(value) => setColors((current) => ({ ...current, up: value }))} /></div><div className="appearance-row"><span>Vela bajista</span><ColorControl label="Vela bajista" value={colors.down} onChange={(value) => setColors((current) => ({ ...current, down: value }))} /></div><div className="appearance-row"><span>Fondo del gráfico</span><ColorControl label="Fondo del gráfico" value={colors.background} onChange={(value) => setColors((current) => ({ ...current, background: value }))} /></div></div>}
       </header>
 
       <section className={`workspace ${toolsOpen ? '' : 'tools-closed'} ${favoritesOpen ? '' : 'favorites-closed'}`}>
         <aside className="toolrail">
-          <button className="rail-toggle" onClick={() => setToolsOpen(false)}><ChevronLeft size={17} /></button>
+          <button className="rail-toggle" aria-label="Ocultar herramientas" onClick={() => setToolsOpen(false)}><ChevronLeft size={17} /></button>
           {TOOL_ITEMS.map(({ id, label, icon: Icon }) => <button key={id} disabled={studiesLocked && id !== 'cursor' && id !== 'ruler'} className={activeTool === id ? 'active' : ''} onClick={() => { setActiveTool(id); setDraft(null); setFibExtStage(0); }} data-tooltip={label} aria-label={label}><Icon size={19} /></button>)}
           <span className="rail-divider" />
           <button onClick={() => setDrawings((all) => ({ ...all, [drawingKey]: currentDrawings.slice(0, -1) }))} disabled={studiesLocked || !currentDrawings.length} data-tooltip="Deshacer dibujo"><Undo2 size={19} /></button>
           <button onClick={() => setShowStudies(!showStudies)} className={!showStudies ? 'active' : ''} data-tooltip="Mostrar u ocultar dibujos">{showStudies ? <Eye size={19} /> : <EyeOff size={19} />}</button>
-          <button onClick={toggleStudiesLock} className={studiesLocked ? 'active' : ''} data-tooltip={studiesLocked ? 'Desbloquear dibujos e indicadores' : 'Bloquear dibujos e indicadores'}>{studiesLocked ? <Lock size={19} /> : <Unlock size={19} />}</button>
+          <button aria-label={studiesLocked ? 'Desbloquear dibujos e indicadores' : 'Bloquear dibujos e indicadores'} onClick={toggleStudiesLock} className={studiesLocked ? 'active' : ''} data-tooltip={studiesLocked ? 'Desbloquear dibujos e indicadores' : 'Bloquear dibujos e indicadores'}>{studiesLocked ? <Lock size={19} /> : <Unlock size={19} />}</button>
         </aside>
-        {!toolsOpen && <button className="open-tools edge-button" onClick={() => setToolsOpen(true)}><ChevronRight size={17} /></button>}
+        {!toolsOpen && <button className="open-tools edge-button" aria-label="Mostrar herramientas" onClick={() => setToolsOpen(true)}><ChevronRight size={17} /></button>}
 
         <section className="chart-area">
           <div className="chart-header">
@@ -545,14 +580,14 @@ export default function Home() {
           <div className="history-nav"><button onClick={() => setOffset(chart.maxOffset)}>Inicio</button><input aria-label="Desplazarse por el historial" type="range" min="0" max={chart.maxOffset - chart.minOffset} value={chart.maxOffset - Math.max(chart.minOffset, Math.min(offset, chart.maxOffset))} onChange={(event) => setOffset(chart.maxOffset - Number(event.target.value))} /><button onClick={() => setOffset(0)}>Ahora</button></div>
         </section>
 
-        <aside className="watchlist">
-          <div className="watchlist-header"><div><Star size={17} fill="currentColor" /><strong>Favoritos</strong></div><button onClick={() => setFavoritesOpen(false)}><PanelRightClose size={18} /></button></div>
+        <aside className={`watchlist ${mobileFavoritesOpen ? 'mobile-open' : ''}`} data-app-panel={mobileFavoritesOpen ? true : undefined} role={mobileFavoritesOpen ? 'dialog' : undefined} aria-modal={mobileFavoritesOpen ? true : undefined} aria-label="Favoritos">
+          <div className="watchlist-header"><div><Star size={17} fill="currentColor" /><strong>Favoritos</strong></div><button aria-label="Cerrar favoritos" onClick={() => { setFavoritesOpen(false); setMobileFavoritesOpen(false); }}><PanelRightClose size={18} /></button></div>
           <div className="watchlist-columns"><span>Activo</span><span>Último</span><span>Cambio</span></div>
-          <div className="watchlist-items">{favorites.map((id) => catalog.find((item) => item.symbol === id)).filter(Boolean).map((item) => <div className={`watch-row ${symbol === item!.symbol ? 'active' : ''}`} key={item!.symbol}><button onClick={() => setSymbol(item!.symbol)}><AssetIcon asset={item!} /><span className="watch-name"><strong>{item!.symbol}</strong><small>{item!.category}</small></span><span className="watch-price">{item!.price ? formatPrice(item!.price).replace('$', '') : '—'}</span><span className={item!.change >= 0 ? 'positive' : 'negative'}>{item!.price ? `${item!.change >= 0 ? '+' : ''}${item!.change.toFixed(2)}%` : '—'}</span></button><button className="remove-favorite" onClick={() => setFavorites((list) => list.filter((entry) => entry !== item!.symbol))} aria-label={`Quitar ${item!.symbol} de favoritos`}><X size={13} /></button></div>)}</div>
-          <button className="add-favorite" onClick={() => setAssetMenu(true)}><Plus size={16} /> Buscar y agregar activo</button>
+          <div className="watchlist-items">{favorites.map((id) => catalog.find((item) => item.symbol === id)).filter(Boolean).map((item) => <div className={`watch-row ${symbol === item!.symbol ? 'active' : ''}`} key={item!.symbol}><button onClick={() => { setSymbol(item!.symbol); setMobileFavoritesOpen(false); }}><AssetIcon asset={item!} /><span className="watch-name"><strong>{item!.symbol}</strong><small>{item!.category}</small></span><span className="watch-price">{item!.price ? formatPrice(item!.price).replace('$', '') : '—'}</span><span className={item!.change >= 0 ? 'positive' : 'negative'}>{item!.price ? `${item!.change >= 0 ? '+' : ''}${item!.change.toFixed(2)}%` : '—'}</span></button><button className="remove-favorite" onClick={() => setFavorites((list) => list.filter((entry) => entry !== item!.symbol))} aria-label={`Quitar ${item!.symbol} de favoritos`}><X size={13} /></button></div>)}</div>
+          <button className="add-favorite" onClick={() => openPanel('assets')}><Plus size={16} /> Buscar y agregar activo</button>
           <div className="live-quote"><span>Activo en pantalla</span><div><AssetIcon asset={asset} size="large" /><p><strong>{symbol}</strong><small>{market.exchange} · actualización cada 15 s</small></p></div><b>{formatPrice(market.price, market.currency)}</b><em className={market.change >= 0 ? 'positive' : 'negative'}>{market.change >= 0 ? '+' : ''}{market.change.toFixed(2)}%</em></div>
         </aside>
-        {!favoritesOpen && <button className="open-watchlist edge-button" onClick={() => setFavoritesOpen(true)}><PanelRightOpen size={18} /></button>}
+        {!favoritesOpen && <button className="open-watchlist edge-button" aria-label="Mostrar favoritos" onClick={() => setFavoritesOpen(true)}><PanelRightOpen size={18} /></button>}
       </section>
     </main>
   );
