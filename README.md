@@ -11,6 +11,7 @@ La tienda ya está configurada y permanecerá vacía hasta que se añadan aplica
 - **Ahorros Familiares**: depósitos, retiros, traspasos, filtros y estados de cuenta PDF.
 - **GraphicView**: análisis técnico visual para mercados.
 - **Pokédex**: reconocimiento y consulta personal de Pokémon.
+- **Basta**: juego de mesa ¡Basta! digital para 2 a 10 jugadores, con ruleta de letras, temporizador de 10 segundos y avatares con fotos.
 
 ## Agregar la tienda en Umbrel
 

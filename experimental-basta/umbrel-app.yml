@@ -1,0 +1,39 @@
+manifestVersion: 1
+id: experimental-basta
+name: Basta
+tagline: Una categoría, diez segundos y una palabra por turno
+icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-basta/icon.png
+category: games
+version: "2.0.0"
+port: 9089
+description: >-
+  Versión digital del juego de mesa ¡Basta! para jugar en el iPad o en cualquier
+  navegador de tu red. Juegan de 2 a 10 personas en la misma pantalla: cada una
+  escribe su nombre y elige un avatar o sube una foto desde su galería o archivos.
+  Un sorteo decide quién empieza. Sale una tarjeta con una categoría al azar
+  (122 en total) y una ruleta con 20 letras que cambian de orden y de selección
+  en cada tarjeta, con solo una letra difícil (K, Q, W, X, Y o Z). En tu turno
+  dices una palabra, tocas su letra y sumas un punto; el turno pasa solo al
+  siguiente jugador con el reloj otra vez en 10 segundos. Quien se queda sin
+  tiempo sale de la tarjeta y el último en pie gana 3 puntos extra.
+  El botón central muestra la carita de quien juega y la cuenta regresiva.
+  No necesita internet ni cuentas; los nombres y fotos se guardan en el
+  navegador de cada dispositivo.
+releaseNotes: >-
+  Nueva versión del juego desde cero: una palabra por turno con cambio
+  automático, de 2 a 10 jugadores, avatares con fotos propias, letras al azar
+  en cada tarjeta sin Ñ y con una sola letra difícil, 122 categorías, sonidos y
+  diseño para iPad. Los datos de la versión anterior no se migran.
+developer: Experimental Labs
+website: https://github.com/orbitpixel-4827/umbrel-community-app-store
+submitter: Experimental Labs
+submission: https://github.com/orbitpixel-4827/umbrel-community-app-store
+repo: https://github.com/orbitpixel-4827/umbrel-community-app-store/tree/main/experimental-basta
+support: https://github.com/orbitpixel-4827/umbrel-community-app-store/issues
+gallery:
+  - https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-basta/gallery/1-juego.jpg
+  - https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-basta/gallery/2-jugadores.jpg
+dependencies: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
