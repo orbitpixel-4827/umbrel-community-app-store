@@ -1,0 +1,16 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createGame,start,press,pass,expire,pause,undo,remaining,nextRound,STANDARD,SPANISH} from '../static/engine.mjs';
+import {CATEGORIES} from '../static/categories.mjs';
+const players=Array.from({length:10},(_,i)=>({id:String(i),name:`Persona ${i}`,avatar:'',preset:i%6}));
+const opts={mode:'classic',target:3,fullAlphabet:false};
+const make=(n=2,options={})=>createGame(players.slice(0,n),{...opts,...options},CATEGORIES,()=>.3);
+test('2–10 participantes, nombres obligatorios y distintos',()=>{assert.throws(()=>make(1));assert.equal(make(10).players.length,10);assert.throws(()=>createGame([{name:'Ana'},{name:' ana '}],opts,CATEGORIES));assert.throws(()=>createGame([{name:''},{name:'Ana'}],opts,CATEGORIES));});
+test('55 categorías únicas, exactamente 50 adicionales y Ñ en alfabeto completo',()=>{assert.equal(CATEGORIES.length,55);assert.equal(CATEGORIES.filter(c=>c.group==='extra').length,50);assert.equal(new Set(CATEGORIES.map(c=>c.name)).size,55);assert.equal(STANDARD.length,20);assert.equal(SPANISH.length,27);assert.ok(SPANISH.includes('Ñ'));});
+test('puntos, letras bloqueadas, centro y reinicio de 10 segundos',()=>{const g=make();start(g,0);assert.equal(pass(g,100),false);const original=g.current;assert.ok(press(g,'A',200));assert.equal(g.players[original].points,1);assert.equal(press(g,'A',300),false);assert.equal(press(g,'B',300),false);assert.ok(pass(g,400));assert.notEqual(g.current,original);assert.equal(g.deadline,10400);assert.equal(press(g,'A',500),false);});
+test('ráfaga permite varias letras y deshacer resta el punto correcto',()=>{const g=make(3,{mode:'burst'});start(g,0);press(g,'A',1);press(g,'B',2);assert.equal(g.players[g.current].points,2);assert.ok(undo(g));assert.equal(g.players[g.current].points,1);assert.deepEqual(g.used,['A']);});
+test('no acepta letras ni pases después del plazo',()=>{const g=make(3);start(g,0);assert.equal(press(g,'A',10000),false);assert.equal(g.players.filter(p=>p.active).length,2);assert.equal(g.status,'ready');const h=make(3);start(h,0);press(h,'A',1);assert.equal(pass(h,10000),false);assert.equal(h.status,'ready');});
+test('pausa conserva tiempo, al reanudar no se reinicia el turno',()=>{const g=make();start(g,1000);pause(g,4000);assert.equal(remaining(g,99999),7000);start(g,10000);assert.equal(g.deadline,17000);});
+test('eliminación salta ausentes y acaba ronda; tres tarjetas terminan partida',()=>{const g=make();for(let i=0;i<3;i++){g.current=0;start(g,0);expire(g,10000);assert.equal(g.players[g.current].cards,i+1);assert.equal(g.status,i===2?'finished':'roundEnd');if(i<2)nextRound(g);}assert.equal(g.status,'finished');});
+test('agotar letras abre prórroga y conserva personas activas',()=>{const g=make();start(g,0);for(let i=0;i<20;i++){assert.ok(press(g,STANDARD[i],i*10+1));assert.ok(pass(g,i*10+2));}assert.equal(g.status,'ready');assert.equal(g.overtime,1);assert.equal(g.required,2);assert.equal(g.used.length,0);assert.equal(g.players.filter(p=>p.active).length,2);});
+test('categorías sin repetir hasta agotar mazo',()=>{const g=make(),ids=new Set([g.category.id]);for(let i=1;i<55;i++){nextRound(g);ids.add(g.category.id);}assert.equal(ids.size,55);});
