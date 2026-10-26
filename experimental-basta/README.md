@@ -41,3 +41,7 @@ node --check static/app.mjs
 Paquete `experimental-basta` para la tienda comunitaria existente. El manifiesto publica la aplicación «Basta» en el puerto 9089; servidor interno 8765. Imagen multi arquitectura en ghcr.io/orbitpixel-4827/basta:1.0.0. Datos persistentes en `${APP_DATA_DIR}/data`. Reiniciar o actualizar conserva nombres, avatares y estado. No eliminar ese directorio ni volúmenes al actualizar.
 
 `CONTEXTO.md` es la memoria para retomar el trabajo, incluyendo limitaciones y estado real de publicación.
+
+## Instalar desde tu tienda
+
+Umbrel → App Store → Experimental App Store → Basta → Instalar. Si aún no aparece, actualiza la tienda o vuelve a abrirla. La instalación la realizará el usuario por su elección. Consulta INSTALAR.md para los detalles.

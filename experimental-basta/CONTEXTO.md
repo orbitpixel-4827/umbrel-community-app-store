@@ -62,3 +62,10 @@ Actualizar este archivo al concluir cada cambio importante. Leerlo primero al re
 - El servicio no se ha instalado ni ejecutado en Umbrel. La validación funcional corresponde al servidor de desarrollo en SSD y a las pruebas de CI.
 - Todas las fotos/nombres de prueba están únicamente en data/ del SSD; el repositorio solo contiene imágenes de interfaz con nombres ficticios. No hay datos reales ni credenciales.
 - La estética final sustituye MiEstilo por juego de mesa. Capturas en docs/ del SSD y gallery/ en GitHub.
+
+## Estado definitivo de entrega — 26-10-2026
+- Código final probado: 849ea4734a4983df735205edb6de57464c6c9d1e. Workflow final exitoso: https://github.com/orbitpixel-4827/umbrel-community-app-store/actions/runs/40416237144 (13 pruebas + imagen amd64/arm64).
+- Imagen final: ghcr.io/orbitpixel-4827/basta:1.0.0@sha256:32235058c58444e4e4b120394b3794cd1a7e36e2ad687bda6f03c04d2c8765d6; compose fijado a ese digest. Descarga pública del paquete comprobada en construcción previa; mismo paquete y etiqueta.
+- Nombre Basta en tienda Experimental App Store. NO instalada en Umbrel: usuario prefirió instalarla él. Guía INSTALAR.md. No reintentar instalación sin nueva petición.
+- Pruebas de navegador con 2 y 10 participantes; clásico/ráfaga, puntos, bloqueo de letras, cambio de turno, pausa, recuperación, carga y recorte de foto. Revisión 320/390/1280 px. En 320 px scrollWidth=clientWidth=320, sin desbordamiento horizontal.
+- Memoria portable saneada en GitHub; memoria local completa en este archivo del SSD. Sin secretos, datos reales ni fotos personales publicados.
