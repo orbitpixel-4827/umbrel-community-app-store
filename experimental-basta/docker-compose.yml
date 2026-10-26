@@ -5,9 +5,11 @@ services:
     environment:
       APP_HOST: experimental-basta_web_1
       APP_PORT: 8080
+      # El iPad pide el ícono y el manifiesto sin la sesión de Umbrel (también por Tailscale)
+      PROXY_AUTH_WHITELIST: "/apple-touch-icon.png,/apple-touch-icon-precomposed.png,/favicon-32.png,/favicon.ico,/icon-192.png,/icon-512.png,/manifest.webmanifest"
 
   web:
-    image: ghcr.io/orbitpixel-4827/basta:2.0.0
+    image: ghcr.io/orbitpixel-4827/basta:2.0.1
     restart: on-failure
     read_only: true
     tmpfs:

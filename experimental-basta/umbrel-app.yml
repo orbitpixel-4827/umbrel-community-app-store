@@ -4,7 +4,7 @@ name: Basta
 tagline: Una categoría, diez segundos y una palabra por turno
 icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-basta/icon.png
 category: games
-version: "2.0.0"
+version: "2.0.1"
 port: 9089
 description: >-
   Versión digital del juego de mesa ¡Basta! para jugar en el iPad o en cualquier
@@ -20,10 +20,9 @@ description: >-
   No necesita internet ni cuentas; los nombres y fotos se guardan en el
   navegador de cada dispositivo.
 releaseNotes: >-
-  Nueva versión del juego desde cero: una palabra por turno con cambio
-  automático, de 2 a 10 jugadores, avatares con fotos propias, letras al azar
-  en cada tarjeta sin Ñ y con una sola letra difícil, 122 categorías, sonidos y
-  diseño para iPad. Los datos de la versión anterior no se migran.
+  Ícono nuevo para Umbrel y para la pantalla de inicio del iPad. Al usar
+  "Agregar a pantalla de inicio" desde Safari (en tu red o por Tailscale), la
+  app conserva su ícono y se abre a pantalla completa como una app.
 developer: Experimental Labs
 website: https://github.com/orbitpixel-4827/umbrel-community-app-store
 submitter: Experimental Labs

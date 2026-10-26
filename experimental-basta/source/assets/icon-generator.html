@@ -1,0 +1,55 @@
+<html><head><style>
+@font-face{font-family:P;src:url(file:///usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf)}
+body{margin:0}</style></head><body>
+<canvas id="c" width="1024" height="1024"></canvas>
+<script>
+document.fonts.load('700 100px P').then(draw);
+function draw(){
+const c=document.getElementById('c'),x=c.getContext('2d'),S=1024,cx=512,cy=500;
+// fondo azul con brillo
+let g=x.createRadialGradient(380,300,60,512,512,760);g.addColorStop(0,'#5cc9f2');g.addColorStop(.55,'#2a9bd8');g.addColorStop(1,'#14609e');
+x.fillStyle=g;x.fillRect(0,0,S,S);
+// rayos suaves
+x.save();x.translate(cx,cy);x.globalAlpha=.07;x.fillStyle='#fff';
+for(let i=0;i<16;i++){x.rotate(Math.PI/8);x.beginPath();x.moveTo(0,0);x.lineTo(-60,-900);x.lineTo(60,-900);x.closePath();x.fill();}
+x.restore();
+// sombra de la ruleta
+x.save();x.filter='blur(28px)';x.fillStyle='rgba(8,30,60,.45)';x.beginPath();x.ellipse(cx,cy+46,392,380,0,0,7);x.fill();x.restore();
+// disco rojo con canto
+x.beginPath();x.arc(cx,cy+18,300,0,7);x.fillStyle='#8a1a24';x.fill();
+g=x.createRadialGradient(cx-110,cy-130,30,cx,cy,300);g.addColorStop(0,'#ff6a72');g.addColorStop(.5,'#e8323e');g.addColorStop(1,'#b81f2b');
+x.beginPath();x.arc(cx,cy,300,0,7);x.fillStyle=g;x.fill();
+// anillo azul
+x.beginPath();x.arc(cx,cy,212,0,7);x.lineWidth=44;x.strokeStyle='#1d82b0';x.stroke();
+x.beginPath();x.arc(cx,cy-3,212,0,7);x.lineWidth=36;x.strokeStyle='#45c3f0';x.stroke();
+// teclas
+const L='ABCDEFGHIJLM',n=12,R=372,T=118;
+function rr(X,Y,W,H,r){x.beginPath();x.roundRect(X,Y,W,H,r);}
+for(let i=0;i<n;i++){const a=i/n*Math.PI*2;const X=cx+R*Math.sin(a),Y=cy-R*Math.cos(a);
+ x.save();x.translate(X,Y);
+ x.save();x.filter='blur(6px)';x.fillStyle='rgba(0,0,0,.28)';rr(-T/2+4,-T/2+16,T,T,30);x.fill();x.restore();
+ rr(-T/2,-T/2+12,T,T,30);x.fillStyle='#c7c2b6';x.fill();
+ const tg=x.createLinearGradient(0,-T/2,0,T/2);tg.addColorStop(0,'#ffffff');tg.addColorStop(1,'#efebe3');
+ rr(-T/2,-T/2,T,T,30);x.fillStyle=tg;x.fill();
+ x.fillStyle='#1b1c22';x.font='700 78px P';x.textAlign='center';x.textBaseline='middle';x.fillText(L[i],0,6);
+ x.restore();}
+// botón central
+x.beginPath();x.arc(cx,cy+16,156,0,7);x.fillStyle='#c7c2b6';x.fill();
+g=x.createLinearGradient(0,cy-156,0,cy+156);g.addColorStop(0,'#ffffff');g.addColorStop(1,'#eeeae2');
+x.beginPath();x.arc(cx,cy,156,0,7);x.fillStyle=g;x.fill();
+// arco del temporizador
+x.lineCap='round';
+x.beginPath();x.arc(cx,cy,132,0,7);x.lineWidth=20;x.strokeStyle='#e9e4da';x.stroke();
+x.beginPath();x.arc(cx,cy,132,-Math.PI/2,-Math.PI/2+Math.PI*2*.72);x.lineWidth=22;x.strokeStyle='#ffc61a';x.stroke();
+// ¡B!
+x.save();x.translate(cx,cy+8);x.rotate(-.09);x.textAlign='center';x.textBaseline='middle';x.font='700 190px P';
+x.fillStyle='#8a1a24';x.fillText('¡B!',6,16);
+x.fillStyle='#e8323e';x.fillText('¡B!',0,6);
+x.restore();
+// destello
+x.save();x.translate(898,108);x.fillStyle='#ffd23f';x.beginPath();
+for(let k=0;k<8;k++){const r=k%2?15:52,a=k*Math.PI/4;x.lineTo(r*Math.sin(a),-r*Math.cos(a));}x.closePath();x.fill();x.restore();
+x.save();x.translate(960,214);x.fillStyle='#fff';x.globalAlpha=.85;x.beginPath();
+for(let k=0;k<8;k++){const r=k%2?8:28,a=k*Math.PI/4;x.lineTo(r*Math.sin(a),-r*Math.cos(a));}x.closePath();x.fill();x.restore();
+document.title='done';}
+</script></body></html>

@@ -105,7 +105,11 @@ En el código, las palabras en MAYÚSCULAS de cada categoría se resaltan autom�
 - Workflow `.github/workflows/basta-image.yml`: extrae el `<script>` y lo revisa con `node --check`, y luego construye y publica `basta:2.0.0`.
 - Ícono de la tienda: ruleta dibujada con canvas (`icon.png` 256 px). Galería: `gallery/1-juego.jpg` y `gallery/2-jugadores.jpg`.
 - En la tienda, `source/` guarda una copia de `src/`, `assets/` y `build.py`, y `CONTEXTO.md` es una copia de este archivo.
-- **Estado (26-oct-2026):** commit `9244ac6` listo, pero **el push fue rechazado (403)**: Claude no tiene acceso de escritura al repo. Hace falta que el usuario reconecte GitHub o instale la GitHub App de Claude en su cuenta. También hay una copia en `umbrel/` de la carpeta local, con `basta-2.0.0.patch` para aplicarlo a mano con `git am`.
+- **Estado:** el usuario dio acceso de GitHub. La 2.0.0 se subió en el commit `2240156` y el build salió bien. La **2.0.1** agrega el ícono nuevo y el soporte de web app.
+- **Ícono (2.0.1):** ruleta roja con 12 teclas blancas (A–M) sobre fondo azul con rayos, botón central con "¡B!" y un arco amarillo de temporizador, y destellos en la esquina. Es a sangre completa, sin esquinas redondeadas, porque iPadOS y Umbrel aplican su propia máscara. El original de 1024 px está en `source/assets/icon-1024.png` y el generador en `source/assets/icon-generator.html` (canvas + Poppins Bold). Tamaños exportados: icon.png 256 (tienda), apple-touch-icon(-precomposed).png 180, icon-192, icon-512, favicon-32 y favicon.ico.
+- **Web app en el iPad:** en el `<head>` van `apple-touch-icon`, `manifest.webmanifest` (standalone, start_url y scope `./`), `theme-color` y las metas de Apple. Todas las URLs son **relativas** para que funcionen con cualquier host (IP local, umbrel.local o el nombre de Tailscale) y llevan `?v=2` para saltar el caché de íconos de iOS. **Al cambiar el ícono, subir ese número.**
+- **Umbrel `app_proxy`:** `PROXY_AUTH_WHITELIST` deja pasar sin sesión los íconos y el manifiesto, porque iOS los descarga por fuera de la sesión y sin esto el ícono saldría como captura de pantalla.
+- **Digest de la imagen:** no se pudo leer desde aquí (ghcr y la API de GitHub responden 403 sin token). El compose usa solo el tag, igual que GraphicView.
 - Pendiente después del primer build: fijar el digest `@sha256:` de la imagen en `docker-compose.yml`, como en las otras apps de la tienda.
 - Al actualizar el juego: recompilar, copiar a `static/index.html` y subir la versión en 3 lugares (umbrel-app.yml, tag del compose y tag del workflow).
 
@@ -115,3 +119,4 @@ En el código, las palabras en MAYÚSCULAS de cada categoría se resaltan autom�
 - **2026-10-26 · v3**: letras al azar en cada tarjeta (20 de 27, alfabeto español); de 2 a 10 jugadores; paso inicial "¿Cuántos jugadores?"; selector de avatar con Chico, Chica, inicial o foto subida; marcador en fila; eliminación con 3 o más jugadores; sorteo entre N jugadores; la tarjeta ajusta el tamaño de las palabras largas.
 - **2026-10-26 · v4**: se quitó la Ñ y solo sale UNA letra difícil (K, Q, W, X, Y o Z) por ruleta; las otras 19 son comunes.
 - **2026-10-26 · Umbrel**: app `experimental-basta` 2.0.0 preparada para la tienda comunitaria (nginx + workflow ghcr). El push fue rechazado por permisos de GitHub y queda pendiente.
+- **2026-10-26 · Umbrel 2.0.1**: ícono nuevo y soporte de web app en el iPad (manifiesto, apple-touch-icon y lista blanca del proxy para que funcione por Tailscale).

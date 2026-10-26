@@ -53,9 +53,9 @@ jobs:
           context: ./experimental-basta
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/orbitpixel-4827/basta:2.0.0
+          tags: ghcr.io/orbitpixel-4827/basta:2.0.1
           labels: |
             org.opencontainers.image.title=Basta
             org.opencontainers.image.description=Juego de mesa Basta digital para umbrelOS
             org.opencontainers.image.source=https://github.com/orbitpixel-4827/umbrel-community-app-store
-            org.opencontainers.image.version=2.0.0
+            org.opencontainers.image.version=2.0.1
