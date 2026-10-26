@@ -46,3 +46,19 @@ Actualizar este archivo al concluir cada cambio importante. Leerlo primero al re
 
 ## Cambio de dirección visual
 - El usuario pidió expresamente: «Omite MiEstilo y haz que parezca un juego». MiEstilo deja de aplicar a Basta. Nueva apariencia de juego de mesa: fondo azul nocturno, rueda roja y azul, fichas claras, tarjetas amarillas, tipografía gruesa y marcador vivo. Conservar accesibilidad y funciones.
+
+## Publicación
+- Código publicado en main mediante plugin GitHub: commit 01e66de0babc38458d39deda342576a8da0e6110.
+- Carpeta remota experimental-basta; workflow .github/workflows/basta-image.yml; imagen ghcr.io/orbitpixel-4827/basta:1.0.0.
+- Nueva apariencia solicitada ya aplicada y revisada en navegador. No aplicar MiEstilo en cambios futuros salvo nueva petición.
+- Falta comprobar construcción remota y despliegue en Umbrel; no afirmar instalado todavía.
+- El usuario eligió «Prefiero instalarlo yo». NO instalar la aplicación ni volver a pedir acceso. Entregar pasos de instalación en su tienda existente.
+- Primera compilación exitosa: GitHub Actions 40415652649 (verify + build). Descarga anónima de GHCR comprobada: HTTP 200, amd64 y arm64; digest inicial d69296673b532fb358ca60ff95219379cc15b40526ad618dae805547388c59fe. Falta revisión final que conserva avatar al abrir/cerrar su selector y afina diseño a 320 px.
+
+- Verificado manualmente en navegador: 10 participantes, límite de altas, modo ráfaga con dos letras sumando dos puntos. Tamaños 320, 390 y 1280 px; ajustes para conservar avatar central y encabezado en 320 px. Se conserva la foto previa al abrir y guardar selector.
+
+## Entrega preparada
+- El usuario instalará desde Experimental App Store → Basta → Instalar.
+- El servicio no se ha instalado ni ejecutado en Umbrel. La validación funcional corresponde al servidor de desarrollo en SSD y a las pruebas de CI.
+- Todas las fotos/nombres de prueba están únicamente en data/ del SSD; el repositorio solo contiene imágenes de interfaz con nombres ficticios. No hay datos reales ni credenciales.
+- La estética final sustituye MiEstilo por juego de mesa. Capturas en docs/ del SSD y gallery/ en GitHub.

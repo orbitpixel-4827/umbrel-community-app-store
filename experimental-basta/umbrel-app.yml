@@ -1,5 +1,7 @@
 manifestVersion: 2.0
 id: experimental-basta
+storage:
+  dataRoot: data
 name: Basta
 version: "1.0.0"
 tagline: Una categoría, diez segundos y todas tus ideas
@@ -23,7 +25,8 @@ website: https://github.com/orbitpixel-4827/umbrel-community-app-store
 repo: https://github.com/orbitpixel-4827/umbrel-community-app-store/tree/main/experimental-basta
 support: https://github.com/orbitpixel-4827/umbrel-community-app-store/issues
 dependencies: []
-gallery: []
+gallery:
+  - https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-basta/gallery/escritorio.png
 path: ""
 defaultUsername: ""
 defaultPassword: ""

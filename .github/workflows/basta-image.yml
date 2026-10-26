@@ -3,7 +3,10 @@ on:
   push:
     branches: [main]
     paths:
-      - "experimental-basta/**"
+      - "experimental-basta/server.py"
+      - "experimental-basta/static/**"
+      - "experimental-basta/tests/**"
+      - "experimental-basta/Dockerfile"
       - ".github/workflows/basta-image.yml"
   workflow_dispatch:
 permissions:
