@@ -1,5 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+let writes: Promise<unknown> = Promise.resolve();
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -23,9 +25,9 @@ export async function PUT(request: Request) {
     const state = await request.json();
     if (!state || typeof state !== 'object' || Array.isArray(state)) return NextResponse.json({ error: 'Estado no válido' }, { status: 400 });
     await mkdir(dataDir, { recursive: true });
-    const temporary = `${stateFile}.tmp`;
-    await writeFile(temporary, JSON.stringify(state), 'utf8');
-    await rename(temporary, stateFile);
+    const temporary = `${stateFile}.${randomUUID()}.tmp`;
+    const work = writes.catch(() => {}).then(async () => { await writeFile(temporary, JSON.stringify(state), 'utf8'); await rename(temporary, stateFile); });
+    writes = work; await work;
     return NextResponse.json({ saved: true });
   } catch {
     return NextResponse.json({ error: 'No se pudo guardar el espacio de trabajo' }, { status: 500 });

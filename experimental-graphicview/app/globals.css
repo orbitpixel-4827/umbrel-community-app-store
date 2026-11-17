@@ -96,10 +96,10 @@ button { color: inherit; }
 .chart-controls button { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid #29313b; border-radius: 6px; background: #11151b; cursor: pointer; }
 .chart-controls output { min-width: 42px; text-align: center; color: #aeb6c2; font-size: 11px; }
 .chart-canvas { position: relative; min-height: 0; background: var(--chart-bg); overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overscroll-behavior: contain; }
-.chart-canvas svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
-.chart-canvas.drawing svg { cursor: crosshair; }
-.chart-canvas.pannable svg { cursor: grab; }
-.chart-canvas.pannable svg:active { cursor: grabbing; }
+.chart-canvas > svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
+.chart-canvas.drawing > svg { cursor: crosshair; }
+.chart-canvas.pannable > svg { cursor: grab; }
+.chart-canvas.pannable > svg:active { cursor: grabbing; }
 .price-axis-hit { cursor: ns-resize; }
 .movable-drawing { cursor: move; }
 .locked-drawing { cursor: inherit; pointer-events: none; }
@@ -227,7 +227,7 @@ button { color: inherit; }
   .chart-controls span, .chart-controls output { display: none; }
   .chart-controls button { width: 32px; height: 32px; }
   .chart-canvas { min-height: 0; }
-  .chart-canvas svg { min-height: 100%; }
+  .chart-canvas > svg { min-height: 100%; }
   .drawing-editor { top: 8px; right: 8px; width: min(245px, calc(100% - 16px)); max-height: calc(100% - 16px); overflow-y: auto; }
   .drawing-tip { top: 8px; width: max-content; max-width: calc(100% - 20px); text-align: center; }
   .studies-locked-note { bottom: 8px; white-space: nowrap; }
