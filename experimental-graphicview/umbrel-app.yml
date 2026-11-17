@@ -4,7 +4,7 @@ name: GraphicView
 tagline: Análisis técnico visual para tus mercados
 icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-graphicview/icon.png
 category: finance
-version: "1.2.0"
+version: "1.3.0"
 port: 3080
 description: >-
   Sigue Bitcoin desde Bitfinex, acciones, ETF e índices mediante gráficos
@@ -18,9 +18,11 @@ repo: ""
 support: ""
 gallery: []
 releaseNotes: >-
-  Renueva la interfaz con MiEstilo oscuro y conserva las herramientas de análisis.
-  Apariencia accesible en móvil con selector nativo y código hexadecimal para velas
-  y fondo. Añade favoritos móviles y paneles desplazables con gestión de foco.
+  Incorpora las mejoras aprobadas de la evaluación: paneles compactos, rectángulos
+  sutiles con esquinas redondeadas, desplazamiento horizontal y vertical más fluido,
+  controles móviles completos, deshacer y rehacer y exportación del análisis.
+  Mejora el guardado, la selección de objetos y los estados de carga. Conserva
+  favoritos, dibujos, colores, medias móviles y bloqueo existentes.
 
 dependencies: []
 path: ""
