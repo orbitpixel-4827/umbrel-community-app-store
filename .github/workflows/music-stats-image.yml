@@ -34,14 +34,19 @@ jobs:
           context: ./experimental-music-stats
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/orbitpixel-4827/music-stats:1.0.0
+          tags: ghcr.io/orbitpixel-4827/music-stats:1.1.0
           labels: |
             org.opencontainers.image.title=Music Stats
             org.opencontainers.image.source=https://github.com/orbitpixel-4827/umbrel-community-app-store
-            org.opencontainers.image.version=1.0.0
+            org.opencontainers.image.version=1.1.0
+      - name: Test importer regression in isolated container
+        run: |
+          docker run --rm --workdir /app --entrypoint node \
+            -v "$PWD/experimental-music-stats/tests:/app/tests:ro" \
+            ghcr.io/orbitpixel-4827/music-stats:1.1.0 tests/sync-regression.mjs
       - name: Verify published app
         run: |
-          docker run -d --name music-stats-check -p 3001:3001 ghcr.io/orbitpixel-4827/music-stats:1.0.0
+          docker run -d --name music-stats-check -p 3001:3001 ghcr.io/orbitpixel-4827/music-stats:1.1.0
           trap 'docker logs music-stats-check; docker rm -f music-stats-check' EXIT
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://localhost:3001/api/health; then break; fi
@@ -51,3 +56,5 @@ jobs:
           curl --fail http://localhost:3001/ | grep 'id="root"'
           curl --fail http://localhost:3001/stats | grep 'id="root"'
           curl --fail http://localhost:3001/api/dashboard
+          docker exec music-stats-check node -e "fetch('http://127.0.0.1:3001/api/admin/status').then(r=>r.json()).then(d=>{if(d.counts.plays!==0||d.lastfmUsername||d.hasLastfmApiKey)throw new Error('Production image contains demo data')}).catch(e=>{console.error(e);process.exit(1)})"
+          docker exec music-stats-check node -e "fetch('http://127.0.0.1:3001/api/admin/sync',{method:'POST'}).then(async r=>{const d=await r.json();if(r.status!==400||!d.error.includes('LASTFM_USERNAME'))throw new Error('Production Last.fm configuration validation failed')}).catch(e=>{console.error(e);process.exit(1)})"

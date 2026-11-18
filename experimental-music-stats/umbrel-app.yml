@@ -4,7 +4,7 @@ name: Music Stats
 tagline: Tu historia musical, en tu servidor
 icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-music-stats/icon.png
 category: media
-version: "1.0.0"
+version: "1.1.0"
 port: 3001
 description: >-
   Estadísticas privadas de tu actividad musical con Last.fm y SQLite local.
@@ -21,8 +21,11 @@ repo: https://github.com/orbitpixel-4827/umbrel-community-app-store/tree/main/ex
 support: https://github.com/orbitpixel-4827/umbrel-community-app-store/issues
 gallery: []
 releaseNotes: >-
-  Primera versión para la tienda. Interfaz MiEstilo clara y responsive,
-  navegación inferior en móvil, búsqueda accesible y errores visibles.
+  Corrige la importación sin álbum, la paginación de historiales y la
+  recuperación tras interrupciones. Conserva borradores en Ajustes, evita
+  resultados de conexión obsoletos y mejora filtros, reintentos, ordenación
+  móvil y lectura de gráficas. Identifica los tiempos como estimados y
+  protege la biblioteca frente a cambios de cuenta. Conserva los datos existentes.
 dependencies: []
 path: ""
 defaultUsername: ""

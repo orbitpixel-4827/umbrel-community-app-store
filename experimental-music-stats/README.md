@@ -15,6 +15,21 @@ Aplicación web autohospedada para registrar y analizar scrobbles de Last.fm con
 - Búsqueda global de canciones, artistas y álbumes con panel de detalle.
 - Configuración de usuario y API Key de Last.fm desde la interfaz.
 
+## Actualización 1.1.0
+
+Actualiza Music Stats desde tu tienda de Umbrel. Se conservan el puerto 3001,
+la base SQLite, las credenciales guardadas y la caché de portadas; no hace
+falta reinstalar ni borrar datos.
+
+Si la importación anterior quedó recortada o faltan escuchas sin álbum,
+ejecuta una vez **Ajustes → Sincronizar historial completo** para recuperarlas.
+Las siguientes sincronizaciones automáticas continúan cada 30 minutos.
+
+Los tiempos se etiquetan como estimados porque las escuchas sin duración
+utilizan `DEFAULT_TRACK_DURATION_SECONDS` (180 segundos por defecto).
+Para evitar mezclar historias, no se permite cambiar de cuenta si la biblioteca
+ya contiene reproducciones; otra cuenta requiere una biblioteca independiente.
+
 ## Puesta en marcha
 
 ### Instalación desde la tienda de Umbrel

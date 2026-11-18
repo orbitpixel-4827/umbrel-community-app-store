@@ -20,7 +20,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 0; min-height: 100dvh; background: var(--ms-bg); }
 #root { min-height: 100dvh; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 button { cursor: pointer; min-height: 44px; transition: background 180ms, box-shadow 180ms; }
 button:disabled { cursor: progress; opacity: .65; }
 button, a, input { -webkit-tap-highlight-color: transparent; }
@@ -92,6 +92,15 @@ th, td { padding: 16px 12px; text-align: left; border-bottom: 1px solid var(--ms
 th { color: var(--ms-muted); font-size: 12px; font-weight: 650; }
 td { font-size: 14px; overflow-wrap: anywhere; }
 .table-sort { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; color: inherit; background: transparent; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.mobile-sort { display: none; }
+.chart-readout { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; margin-bottom: 16px; }
+.chart-readout label { min-width: 0; max-width: 100%; }
+.select-field { position: relative; }
+.select-field > svg { position: absolute; right: 12px; bottom: 14px; pointer-events: none; color: var(--ms-muted); }
+.chart-readout select, .mobile-sort select { appearance: none; -webkit-appearance: none; width: 100%; min-height: 48px; padding: 8px 40px 8px 12px; border: 1px solid var(--ms-line); border-radius: 24px; background: white; color: var(--ms-text); font-size: 16px; }
+.chart-readout output { color: var(--ms-accent); font-size: 14px; }
+.bar.selected span { background: var(--ms-accent); }
 .period-tabs { display: flex; gap: 4px; width: fit-content; max-width: 100%; padding: 4px; margin-bottom: 28px; border-radius: 28px; background: var(--ms-soft); }
 .period-tabs button { border: 0; border-radius: 24px; padding: 12px 20px; white-space: nowrap; background: transparent; color: var(--ms-muted); }
 .period-tabs button.active { background: var(--ms-accent); color: white; font-weight: 650; }
@@ -166,6 +175,10 @@ td { font-size: 14px; overflow-wrap: anywhere; }
   .chart, .line-chart { height: 180px; }
   .bar small { font-size: 9px; }
   .table-wrap { overflow: visible; }
+  .mobile-sort { display: grid; grid-template-columns: minmax(0, 1fr) 48px; gap: 8px 12px; align-items: end; margin-bottom: 16px; }
+  .mobile-sort label { display: grid; gap: 8px; color: var(--ms-muted); font-size: 13px; }
+  .mobile-sort small { grid-column: 1 / -1; }
+  .sort-direction { display: grid; place-items: center; width: 48px; min-height: 48px; border: 0; border-radius: 50%; background: var(--ms-soft); color: var(--ms-text); }
   table, tbody, tr, td { display: block; width: 100%; }
   thead { display: none; }
   tr { padding: 16px 0; border-bottom: 1px solid var(--ms-line); }

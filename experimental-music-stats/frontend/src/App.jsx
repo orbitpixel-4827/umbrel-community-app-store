@@ -32,17 +32,18 @@ function pageFromPath(pathname) {
 
 function useApi(path, deps = []) {
   const [state, setState] = useState({ loading: true, data: null, error: "" });
+  const [revision, setRevision] = useState(0);
   useEffect(() => {
     let active = true;
-    setState((current) => ({ ...current, loading: true }));
+    setState((current) => ({ ...current, loading: true, error: "" }));
     api(path)
       .then((data) => active && setState({ loading: false, data, error: "" }))
       .catch((error) => active && setState({ loading: false, data: null, error: error.message }));
     return () => {
       active = false;
     };
-  }, deps);
-  return state;
+  }, [path, revision, ...deps]);
+  return { ...state, retry: () => setRevision(value => value + 1) };
 }
 
 function Shell({ page, setPage, children }) {
@@ -96,23 +97,33 @@ function Header({ title, subtitle }) {
 function GlobalSearch() {
   const [query, setQuery] = useState("");
   const [detail, setDetail] = useState(null);
+  const detailRequest = useRef(0);
+  const searchInput = useRef(null);
+  useEffect(() => () => { detailRequest.current += 1; }, []);
   const result = useApi(`/api/search?q=${encodeURIComponent(query)}`, [query]);
   const groups = result.data || { tracks: [], artists: [], albums: [] };
 
   async function openDetail(type, id) {
+    const request = ++detailRequest.current;
     const path = type === "tracks" ? "tracks" : type === "artists" ? "artists" : "albums";
     setDetail({ loading: true });
     try {
-      setDetail(await api(`/api/${path}/${id}`));
+      const data = await api(`/api/${path}/${id}`);
+      if (request === detailRequest.current) setDetail(data);
     } catch (error) {
-      setDetail({ error: error.message });
+      if (request === detailRequest.current) setDetail({ error: error.message });
     }
+  }
+
+  function closeDetail() {
+    detailRequest.current += 1;
+    setDetail(null);
   }
 
   return (
     <div className="search-box">
       <Search size={17} />
-      <input aria-label="Buscar canciones, artistas y álbumes" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar música" />
+      <input ref={searchInput} aria-label="Buscar canciones, artistas y álbumes" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar música" />
       {query ? <button className="search-clear" aria-label="Limpiar búsqueda" onClick={() => setQuery("")}><X size={18} /></button> : null}
       {query.length > 1 && !detail ? (
         <div className="search-results">
@@ -133,12 +144,12 @@ function GlobalSearch() {
           ))}
         </div>
       ) : null}
-      {detail ? <DetailModal detail={detail} onClose={() => setDetail(null)} /> : null}
+      {detail ? <DetailModal detail={detail} onClose={closeDetail} restoreFocus={() => searchInput.current?.focus()} /> : null}
     </div>
   );
 }
 
-function DetailModal({ detail, onClose }) {
+function DetailModal({ detail, onClose, restoreFocus }) {
   const dialog = useRef(null);
   const close = useRef(null);
   useEffect(() => {
@@ -149,7 +160,8 @@ function DetailModal({ detail, onClose }) {
     function onKeyDown(event) {
       if (event.key === "Escape") onClose();
       if (event.key !== "Tab") return;
-      const controls = [...dialog.current.querySelectorAll('button:not(:disabled), a[href], input, [tabindex="0"]')];
+      const controls = [...dialog.current.querySelectorAll('button:not(:disabled), a[href], input, select, textarea, [tabindex="0"]')]
+        .filter(element => element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
       const first = controls[0];
       const last = controls[controls.length - 1];
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
@@ -159,7 +171,8 @@ function DetailModal({ detail, onClose }) {
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
-      previousFocus?.focus();
+      if (previousFocus?.isConnected && previousFocus !== document.body) previousFocus.focus();
+      else restoreFocus?.();
     };
   }, []);
   return createPortal(
@@ -175,7 +188,7 @@ function DetailModal({ detail, onClose }) {
             <strong>{formatNumber(detail.plays || detail.play_count)} reproducciones</strong>
           </div>
         </div>
-        {detail.seconds ? <p>{formatDuration(detail.seconds)} escuchados</p> : null}
+        {detail.seconds ? <p>{formatDuration(detail.seconds)} estimados</p> : null}
         {detail.first_played_at ? <p>Primera escucha: {formatDate(detail.first_played_at)} · Última: {formatDate(detail.last_played_at)}</p> : null}
         {detail.topTracks ? <TopList title="Canciones más escuchadas" items={detail.topTracks} /> : null}
         {detail.topAlbums ? <TopList title="Álbumes más escuchados" items={detail.topAlbums} /> : null}
@@ -193,7 +206,7 @@ function DetailModal({ detail, onClose }) {
 }
 
 function Dashboard() {
-  const { data, loading, error } = useApi("/api/dashboard", []);
+  const { data, loading, error, retry } = useApi("/api/dashboard", []);
   const status = useApi("/api/admin/status", []);
   const needsSetup = status.data?.lastfm && !status.data.lastfm.ok;
   const stats = data?.overview || {
@@ -206,14 +219,15 @@ function Dashboard() {
   return (
     <>
       <Header title="Music Stats" subtitle={new Intl.DateTimeFormat("es", { month: "long", year: "numeric" }).format(new Date())} />
-      {error ? <VisibleError title="No se pudo cargar el dashboard" message={error} /> : null}
+      {error ? <VisibleError title="No se pudo cargar el dashboard" message={error} onRetry={retry} /> : null}
       {status.error ? <VisibleError title="No se pudo leer la configuración" message={status.error} /> : null}
       {needsSetup ? <SetupNotice /> : null}
       {loading ? <Loading compact /> : null}
+      {!loading && data && !error ? <>
       <section className="stat-grid">
         <StatCard label="Canciones" value={formatNumber(stats.totalTracks)} />
         <StatCard label="Reproducciones" value={formatNumber(stats.totalPlays)} />
-        <StatCard label="Tiempo" value={formatDuration(stats.totalSeconds)} />
+        <StatCard label="Tiempo estimado" value={formatDuration(stats.totalSeconds)} />
         <StatCard label="Artistas" value={formatNumber(stats.uniqueArtists)} />
         <StatCard label="Álbumes" value={formatNumber(stats.uniqueAlbums)} />
       </section>
@@ -234,7 +248,7 @@ function Dashboard() {
       </section>
       <section className="wide-grid">
         <div className="panel">
-          <h2>Tiempo acumulado</h2>
+          <h2>Tiempo acumulado estimado</h2>
           <AreaLine data={data?.activity || []} />
         </div>
       </section>
@@ -252,6 +266,7 @@ function Dashboard() {
           ]}
         />
       </section>
+      </> : null}
     </>
   );
 }
@@ -269,10 +284,8 @@ function SetupNotice() {
 
 function StatsPage() {
   const [period, setPeriod] = useState("3m");
-  const { data, loading, error } = useApi(`/api/stats?period=${period}`, [period]);
+  const { data, loading, error, retry } = useApi(`/api/stats?period=${period}`, [period]);
   const status = useApi("/api/admin/status", []);
-  if (loading) return <Loading />;
-  if (error) return <Empty message={error} />;
   return (
     <>
       <Header title="Estadísticas" subtitle="Comparativas y tendencias para periodos largos." />
@@ -283,8 +296,11 @@ function StatsPage() {
         </section>
       ) : null}
       <PeriodTabs value={period} onChange={setPeriod} />
+      {loading ? <Loading compact /> : null}
+      {error ? <VisibleError title="No se pudieron cargar las estadísticas" message={error} onRetry={retry} /> : null}
+      {!loading && data && !error ? <>
       <section className="stat-grid">
-        <StatCard label="Tiempo total" value={formatDuration(data.overview.totalSeconds)} />
+        <StatCard label="Tiempo estimado" value={formatDuration(data.overview.totalSeconds)} />
         <StatCard label="Reproducciones" value={formatNumber(data.overview.totalPlays)} />
         <StatCard label="Promedio diario" value={formatNumber(data.overview.averageDailyPlays)} />
         <StatCard label="Días activos" value={formatNumber(data.overview.activeDays)} />
@@ -295,22 +311,24 @@ function StatsPage() {
         <TopList title="Top 50 álbumes" items={data.albums} type="albums" />
       </section>
       <section className="wide-grid">
-        <TopList title="Artistas en crecimiento" items={data.trends.growingArtists} type="artists" />
+        <TopList title="Artistas destacados" items={data.trends.growingArtists} type="artists" />
         <TopList title="Canciones más repetidas" items={data.trends.repeatedTracks} />
       </section>
+      </> : null}
     </>
   );
 }
 
 function WrappedPage() {
   const [period, setPeriod] = useState("year");
-  const { data, loading, error } = useApi(`/api/wrapped?period=${period}`, [period]);
-  if (loading) return <Loading />;
-  if (error) return <Empty message={error} />;
+  const { data, loading, error, retry } = useApi(`/api/wrapped?period=${period}`, [period]);
   return (
     <>
       <Header title="Wrapped privado" subtitle="Un resumen visual de tu periodo musical sin compartir datos fuera de tu servidor." />
       <PeriodTabs value={period} onChange={setPeriod} />
+      {loading ? <Loading compact /> : null}
+      {error ? <VisibleError title="No se pudo cargar Wrapped" message={error} onRetry={retry} /> : null}
+      {!loading && data && !error ? <>
       <section className="wrapped-hero">
         <Cover item={data.numberOneArtist || {}} type="artist" />
         <Sparkles size={34} />
@@ -321,7 +339,7 @@ function WrappedPage() {
         <WrappedCard title="Canción #1" item={data.numberOneTrack} />
         <WrappedCard title="Álbum #1" item={data.numberOneAlbum} />
         <StatCard label="Reproducciones" value={formatNumber(data.overview.totalPlays)} />
-        <StatCard label="Tiempo escuchado" value={formatDuration(data.overview.totalSeconds)} />
+        <StatCard label="Tiempo estimado" value={formatDuration(data.overview.totalSeconds)} />
         <StatCard label="Día más activo" value={data.busiestDay?.day || "-"} sub={`${formatNumber(data.busiestDay?.plays)} reps`} />
         <StatCard label="Mes más activo" value={data.busiestMonth?.month || "-"} sub={`${formatNumber(data.busiestMonth?.plays)} reps`} />
       </section>
@@ -330,6 +348,7 @@ function WrappedPage() {
         <TopList title="Top 10 artistas" items={data.topArtists} type="artists" />
         <TopList title="Top 10 álbumes" items={data.topAlbums} type="albums" />
       </section>
+      </> : null}
     </>
   );
 }
@@ -345,7 +364,7 @@ function WrappedCard({ title, item }) {
   );
 }
 
-function SettingsPage() {
+function SettingsPage({ draft, setDraft, onDirtyChange }) {
   const [tick, setTick] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [fullSyncing, setFullSyncing] = useState(false);
@@ -353,11 +372,24 @@ function SettingsPage() {
   const [actionError, setActionError] = useState("");
   const [testResult, setTestResult] = useState(null);
   const [saved, setSaved] = useState(false);
-  const [form, setForm] = useState({ lastfmUsername: "", lastfmApiKey: "", lastfmApiSecret: "" });
+  const [saving, setSaving] = useState(false);
+  const testRequest = useRef(0);
+  useEffect(() => () => { testRequest.current += 1; }, []);
+  const form = draft || { lastfmUsername: "", lastfmApiKey: "", lastfmApiSecret: "" };
+  const setForm = setDraft;
+  function changeForm(next) {
+    testRequest.current += 1;
+    setTestResult(null);
+    setTesting(false);
+    setSaved(false);
+    setForm(next);
+  }
   const { data, loading, error } = useApi("/api/admin/status", [tick]);
   useEffect(() => {
-    if (data) setForm((current) => ({ ...current, lastfmUsername: data.lastfmUsername || "" }));
-  }, [data]);
+    if (data && draft === null) setForm({ lastfmUsername: data.lastfmUsername || "", lastfmApiKey: "", lastfmApiSecret: "" });
+  }, [data, draft, setForm]);
+  const dirty = Boolean(draft && (form.lastfmUsername.trim() !== (data?.lastfmUsername || "") || form.lastfmApiKey || form.lastfmApiSecret));
+  useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
   useEffect(() => {
     if (!data?.syncProgress?.running) return undefined;
     const timer = window.setInterval(() => setTick((value) => value + 1), 2500);
@@ -377,17 +409,20 @@ function SettingsPage() {
     }
   }
   async function testConnection() {
+    const request = ++testRequest.current;
     setTesting(true);
     setActionError("");
     setTestResult(null);
     try {
       const result = await api("/api/admin/lastfm/test", { method: "POST" });
-      setTestResult(result);
+      if (request === testRequest.current) setTestResult(result);
     } catch (error) {
-      setActionError(error.message);
-      setTestResult(error.details || { ok: false, error: error.message });
+      if (request === testRequest.current) {
+        setActionError(error.message);
+        setTestResult(error.details || { ok: false, error: error.message });
+      }
     } finally {
-      setTesting(false);
+      if (request === testRequest.current) setTesting(false);
     }
   }
   async function syncFullHistory() {
@@ -405,6 +440,11 @@ function SettingsPage() {
   }
   async function saveSettings(event) {
     event.preventDefault();
+    if (saving) return;
+    const submitted = { ...form };
+    testRequest.current += 1;
+    setTestResult(null);
+    setTesting(false);
     setActionError("");
     setSaved(false);
     const maskedValues = ["[redacted]", "ya configurada", "ya configurado"];
@@ -416,17 +456,23 @@ function SettingsPage() {
       setActionError("La app está usando un valor enmascarado, vuelve a guardar la API Key real.");
       return;
     }
+    setSaving(true);
     try {
       await api("/api/admin/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify(submitted)
       });
-      setForm((current) => ({ ...current, lastfmApiKey: "", lastfmApiSecret: "" }));
+      // An earlier save must not erase a newer draft after navigation.
+      setForm(current => Object.keys(submitted).every(key => current?.[key] === submitted[key])
+        ? { ...submitted, lastfmUsername: submitted.lastfmUsername.trim(), lastfmApiKey: "", lastfmApiSecret: "" }
+        : current);
       setSaved(true);
       setTick((value) => value + 1);
     } catch (error) {
       setActionError(error.message);
+    } finally {
+      setSaving(false);
     }
   }
   if (loading && !data) return <Loading />;
@@ -437,38 +483,40 @@ function SettingsPage() {
       <section className="settings-grid">
         <div className="panel">
           <h2>Last.fm</h2>
-          {actionError ? <div className="inline-error">{actionError}</div> : null}
-          {saved ? <p role="status">Configuración guardada</p> : null}
+          {actionError ? <div className="inline-error" role="alert">{actionError}</div> : null}
+          {saved && !dirty ? <p role="status">Configuración guardada</p> : null}
+          {dirty ? <p role="status">Cambios sin guardar. Guarda la configuración antes de probar la conexión o sincronizar.</p> : null}
           <form className="settings-form" onSubmit={saveSettings}>
             <label>
               Usuario
-              <input value={form.lastfmUsername} onChange={(event) => setForm({ ...form, lastfmUsername: event.target.value })} placeholder="usuario_lastfm" />
+              <input disabled={saving} value={form.lastfmUsername} onChange={(event) => changeForm({ ...form, lastfmUsername: event.target.value })} placeholder="usuario_lastfm" />
             </label>
             <label>
               API Key
-              <input value={form.lastfmApiKey} onChange={(event) => setForm({ ...form, lastfmApiKey: event.target.value })} placeholder={data.hasLastfmApiKey ? "Ya configurada" : "Pega tu API key"} />
+              <input disabled={saving} type="password" autoComplete="off" value={form.lastfmApiKey} onChange={(event) => changeForm({ ...form, lastfmApiKey: event.target.value })} placeholder={data.hasLastfmApiKey ? "Ya configurada" : "Pega tu API key"} />
               {data.lastfm?.apiKeyPrefix ? <small>Cargada: {data.lastfm.apiKeyPrefix}...</small> : null}
             </label>
             <label>
               API Secret
-              <input value={form.lastfmApiSecret} onChange={(event) => setForm({ ...form, lastfmApiSecret: event.target.value })} placeholder={data.hasLastfmApiSecret ? "Ya configurado" : "Opcional"} />
+              <input disabled={saving} type="password" autoComplete="off" value={form.lastfmApiSecret} onChange={(event) => changeForm({ ...form, lastfmApiSecret: event.target.value })} placeholder={data.hasLastfmApiSecret ? "Ya configurado" : "Opcional"} />
               {data.lastfm?.apiSecretPrefix ? <small>Cargado: {data.lastfm.apiSecretPrefix}...</small> : null}
             </label>
-            <button className="primary" type="submit"><Save size={20} />Guardar configuración</button>
+            <button className="primary" type="submit" disabled={saving}><Save size={20} />{saving ? "Guardando configuración" : "Guardar configuración"}</button>
+            {dirty ? <button className="secondary" type="button" disabled={saving} onClick={() => changeForm({ lastfmUsername: data.lastfmUsername || "", lastfmApiKey: "", lastfmApiSecret: "" })}>Descartar cambios</button> : null}
           </form>
-          <button className="primary" onClick={sync} disabled={syncing}>
+          <button className="primary" onClick={sync} disabled={syncing || saving || dirty || data.syncProgress?.running}>
             <RefreshCw size={17} />
             {syncing ? "Sincronizando" : "Sincronizar ahora"}
           </button>
-          <button className="secondary" onClick={testConnection} disabled={testing}>
+          <button className="secondary" onClick={testConnection} disabled={testing || saving || dirty}>
             <Plug size={20} />
             {testing ? "Probando conexión" : "Probar conexión Last.fm"}
           </button>
-          <button className="secondary" onClick={syncFullHistory} disabled={fullSyncing || data.syncProgress?.running}>
+          <button className="secondary" onClick={syncFullHistory} disabled={fullSyncing || saving || dirty || data.syncProgress?.running}>
             <Download size={20} />
             {data.syncProgress?.running && data.syncProgress.mode === "full" ? "Sincronizando historial" : "Sincronizar historial completo"}
           </button>
-          {testResult ? (
+          {testResult && !dirty ? (
             <div className={testResult.ok ? "connection-result ok" : "connection-result error"}>
               <strong>{testResult.ok ? "Conexión correcta" : "Last.fm devolvió un error"}</strong>
               <p>HTTP: {testResult.status || testResult.lastfmStatus || "-"}</p>
@@ -513,24 +561,34 @@ function PeriodTabs({ value, onChange }) {
 }
 
 function Loading({ compact = false }) {
-  return <div className={compact ? "loading-strip" : "empty"}>Cargando estadísticas...</div>;
+  return <div role="status" className={compact ? "loading-strip" : "empty"}>Cargando estadísticas...</div>;
 }
 
 function Empty({ message }) {
   return <VisibleError title="Music Stats" message={message} />;
 }
 
-function VisibleError({ title, message }) {
+function VisibleError({ title, message, onRetry }) {
   return (
-    <section className="visible-error">
-      <h1>{title}</h1>
+    <section className="visible-error" role="alert">
+      <h2>{title}</h2>
       <p>{message || "Ocurrió un error inesperado."}</p>
+      {onRetry ? <button className="secondary" onClick={onRetry}><RefreshCw size={18} />Reintentar</button> : null}
     </section>
   );
 }
 
 export default function App() {
   const [page, setPageState] = useState(() => pageFromPath(window.location.pathname));
+  // Draft credentials stay in memory while navigating, never in browser storage.
+  const [settingsDraft, setSettingsDraft] = useState(null);
+  const [settingsDirty, setSettingsDirty] = useState(false);
+  useEffect(() => {
+    if (!settingsDirty) return undefined;
+    const warn = event => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [settingsDirty]);
   function setPage(nextPage) {
     setPageState(nextPage);
     window.history.pushState({}, "", pagePaths[nextPage] || "/");
@@ -545,9 +603,9 @@ export default function App() {
   const content = useMemo(() => {
     if (page === "stats") return <StatsPage />;
     if (page === "wrapped") return <WrappedPage />;
-    if (page === "settings") return <SettingsPage />;
+    if (page === "settings") return <SettingsPage draft={settingsDraft} setDraft={setSettingsDraft} onDirtyChange={setSettingsDirty} />;
     return <Dashboard />;
-  }, [page]);
+  }, [page, settingsDraft]);
 
   return <Shell page={page} setPage={setPage}>{content}</Shell>;
 }

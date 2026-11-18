@@ -7,7 +7,7 @@ services:
       APP_PORT: 3001
 
   web:
-    image: ghcr.io/orbitpixel-4827/music-stats:1.0.0
+    image: ghcr.io/orbitpixel-4827/music-stats:1.1.0
     init: true
     restart: on-failure
     stop_grace_period: 30s

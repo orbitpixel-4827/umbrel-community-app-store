@@ -69,16 +69,18 @@ function normalizeScrobble(track) {
   const artistName = textValue(track.artist);
   const albumName = textValue(track.album);
   const trackName = textValue(track.name);
-  const playedAtUnix = Number(track.date?.uts);
+  const rawTimestamp = track.date?.uts;
+  const playedAtUnix = Number(rawTimestamp);
 
-  if (!artistName || !albumName || !trackName || !track.date || !Number.isFinite(playedAtUnix)) {
+  if (!artistName || !trackName || rawTimestamp === undefined || rawTimestamp === null || rawTimestamp === "" || !Number.isFinite(playedAtUnix) || playedAtUnix <= 0) {
     return { ok: false, reason: "scrobble incompleto" };
   }
 
-  const playedAt = new Date(playedAtUnix * 1000).toISOString();
-  if (Number.isNaN(new Date(playedAt).getTime())) {
+  const date = new Date(playedAtUnix * 1000);
+  if (Number.isNaN(date.getTime())) {
     return { ok: false, reason: "fecha inválida" };
   }
+  const playedAt = date.toISOString();
 
   return {
     ok: true,
@@ -272,11 +274,10 @@ function importScrobbles(tracks) {
   const importOne = db.transaction((scrobble) => {
     const artist = upsertArtist(scrobble.artistName, scrobble.imageUrl);
     if (!artist?.id) throw new Error(`No se pudo crear artista: ${scrobble.artistName}`);
-    const album = upsertAlbum(artist.id, scrobble.albumName, scrobble.imageUrl);
-    if (!album?.id) throw new Error(`No se pudo crear álbum: ${scrobble.albumName}`);
+    const album = scrobble.albumName ? upsertAlbum(artist.id, scrobble.albumName, scrobble.imageUrl) : null;
     const savedTrack = upsertTrack({
       artistId: artist.id,
-      albumId: album.id,
+      albumId: album?.id || null,
       name: scrobble.trackName,
       durationSeconds: scrobble.durationSeconds,
       externalUid: scrobble.externalUid
@@ -312,6 +313,7 @@ function importScrobbles(tracks) {
 }
 
 export async function syncLastfm(options = {}) {
+  if (syncProgress.running) throw new LastfmError("Ya hay una sincronización en curso.", 409);
   const mode = options.mode || "recent";
   const isFullSync = mode === "full";
   const { username, apiKey, apiKeyMasked } = getLastfmCredentials();
@@ -332,7 +334,11 @@ export async function syncLastfm(options = {}) {
   let totalPages = 1;
   let remoteTotal = 0;
   const latestPlay = db.prepare("SELECT played_at FROM plays ORDER BY played_at DESC LIMIT 1").get();
-  const fromUnix = !isFullSync && latestPlay ? Math.max(0, Math.floor(new Date(latestPlay.played_at).getTime() / 1000) - 86400) : undefined;
+  // Keep the lower bound until every page succeeds, including after interruptions.
+  const pendingFrom = getSetting("LASTFM_RECENT_FROM", "");
+  const fromUnix = isFullSync ? undefined : pendingFrom !== "" ? Number(pendingFrom) : latestPlay ? Math.max(0,
+    Math.floor(new Date(latestPlay.played_at).getTime() / 1000) - 86400) : undefined;
+  if (!isFullSync) setSetting("LASTFM_RECENT_FROM", String(fromUnix ?? 0));
 
   syncProgress.running = true;
   syncProgress.mode = mode;
@@ -351,7 +357,7 @@ export async function syncLastfm(options = {}) {
         user: username,
         limit: "200",
         page: String(page),
-        ...(fromUnix ? { from: String(fromUnix) } : {})
+        ...(fromUnix !== undefined ? { from: String(fromUnix) } : {})
       });
 
       const recent = payload.recenttracks;
@@ -367,7 +373,7 @@ export async function syncLastfm(options = {}) {
       syncProgress.skipped = skipped;
       console.log("[lastfm] sync progress", { mode, page, totalPages, imported, skipped });
       page += 1;
-    } while (page <= totalPages && (isFullSync || page <= 20));
+    } while (page <= totalPages);
 
     db.prepare(`
       UPDATE sync_state
@@ -375,7 +381,8 @@ export async function syncLastfm(options = {}) {
       WHERE id = 1
     `).run(startedAt, new Date().toISOString(), imported);
 
-    if (remoteTotal) setSetting("LASTFM_TOTAL_SCROBBLES", String(remoteTotal));
+    if (isFullSync) setSetting("LASTFM_TOTAL_SCROBBLES", String(remoteTotal));
+    setSetting("LASTFM_RECENT_FROM", "");
     if (isFullSync) setSetting("LASTFM_FULL_SYNC_COMPLETED_AT", new Date().toISOString());
 
     console.log("[lastfm] sync complete", { imported, skipped, syncedAt: startedAt });

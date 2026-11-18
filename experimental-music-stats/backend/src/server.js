@@ -23,6 +23,7 @@ app.use(express.json());
 app.use(morgan("tiny"));
 app.use("/cache", express.static(config.imageCacheDir));
 
+
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "music-stats" });
 });
@@ -119,6 +120,11 @@ app.put("/api/admin/settings", (req, res) => {
   const username = String(req.body.lastfmUsername || "").trim();
   const apiKey = String(req.body.lastfmApiKey || "").trim();
   const apiSecret = String(req.body.lastfmApiSecret || "").trim();
+  if (syncProgress.running) return res.status(409).json({ error: "Espera a que termine la sincronización antes de guardar la configuración." });
+  const previousUsername = getSetting("LASTFM_USERNAME", config.lastfmUsername);
+  if (rowCount("plays") > 0 && previousUsername && previousUsername.toLowerCase() !== username.toLowerCase()) {
+    return res.status(409).json({ error: "No puedes cambiar de cuenta mientras esta biblioteca contenga reproducciones. Usa una biblioteca nueva para otra cuenta." });
+  }
   const isMaskedValue = (value) => {
     const cleanValue = value.toLowerCase();
     return cleanValue === "[redacted]" || cleanValue.startsWith("<hidden") || cleanValue === "ya configurada" || cleanValue === "ya configurado";
