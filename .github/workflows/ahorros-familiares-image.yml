@@ -41,6 +41,10 @@ jobs:
         run: |
           python -B -m py_compile app.py manage.py
           node --check static/app.js
+      - name: Verify container startup and persistent data
+        run: |
+          docker build -t ahorros-familiares-ci .
+          python -B tests/container_smoke.py
 
   build:
     needs: verify
@@ -60,9 +64,9 @@ jobs:
           context: ./experimental-ahorros-familiares
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/orbitpixel-4827/ahorros-familiares:1.0.0
+          tags: ghcr.io/orbitpixel-4827/ahorros-familiares:1.1.0
           labels: |
             org.opencontainers.image.title=Ahorros Familiares
             org.opencontainers.image.description=Ahorros familiares privados para umbrelOS
             org.opencontainers.image.source=https://github.com/orbitpixel-4827/umbrel-community-app-store
-            org.opencontainers.image.version=1.0.0
+            org.opencontainers.image.version=1.1.0

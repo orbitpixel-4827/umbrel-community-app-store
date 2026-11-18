@@ -191,12 +191,13 @@ def statement_pdf(title, scope, summary, movements, generated_at):
         text(427, 728, f"Generado: {generated_at}", 8)
         line(44, 715, 568, 715, 1)
 
-        text(44, 690, "SALDO", 8, True)
-        text(44, 670, pdf_money(summary["balance_cents"]), 16, True)
+        text(44, 690, "SALDO FINAL", 8, True)
+        text(44, 670, pdf_money(summary["closing_balance_cents"]), 16, True)
         text(220, 690, "DEPÓSITOS / ENTRADAS", 8, True)
         text(220, 670, pdf_money(summary["deposits_cents"]), 13, True)
         text(405, 690, "RETIROS / SALIDAS", 8, True)
         text(405, 670, pdf_money(summary["withdrawals_cents"]), 13, True)
+        text(44, 650, f"Saldo inicial: {pdf_money(summary['opening_balance_cents'])}   ·   Neto del periodo: {pdf_money(summary['balance_cents'], signed=True)}", 9)
 
         top = 636
         commands.append("0.94 g 44 618 524 24 re f 0 g")
@@ -402,7 +403,23 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def get_transactions(self, query):
         where, params = filters_from_query(query)
+        try:
+            offset = int(query.get("offset", ["0"])[0])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("La página de movimientos no es válida.") from exc
+        if offset < 0:
+            raise ValueError("La página de movimientos no es válida.")
+        page_size = 100
         sql = f"""
+            WITH filtered AS (
+                SELECT t.id, t.occurred_at,
+                       COALESCE(t.transfer_id, 'movement:' || t.id) AS movement_key
+                FROM transactions t {where}
+            ), page AS (
+                SELECT MAX(id) AS id, MAX(occurred_at) AS occurred_at
+                FROM filtered GROUP BY movement_key
+                ORDER BY occurred_at DESC, id DESC LIMIT ? OFFSET ?
+            )
             SELECT t.id, t.kind, t.amount_cents, t.note, t.occurred_at, t.created_at, t.transfer_id,
                    p.id AS person_id, p.name AS person_name,
                    s.id AS type_id, s.name AS type_name,
@@ -417,13 +434,18 @@ class AppHandler(BaseHTTPRequestHandler):
             FROM transactions t
             JOIN people p ON p.id = t.person_id
             JOIN savings_types s ON s.id = t.savings_type_id
-            {where}
+            WHERE t.id IN (SELECT id FROM page)
             ORDER BY t.occurred_at DESC, t.id DESC
-            LIMIT 1000
         """
         with database() as db:
-            rows = db.execute(sql, params).fetchall()
-        self.send_json({"items": [dict(row) for row in rows]})
+            rows = db.execute(sql, [*params, page_size, offset]).fetchall()
+            total = db.execute(
+                f"SELECT COUNT(DISTINCT COALESCE(t.transfer_id, 'movement:' || t.id)) FROM transactions t {where}",
+                params,
+            ).fetchone()[0]
+        next_offset = offset + len(rows)
+        self.send_json({"items": [dict(row) for row in rows], "total": total,
+                        "next_offset": next_offset if next_offset < total else None})
 
     def get_summary(self, query):
         where, params = filters_from_query(query)
@@ -490,6 +512,20 @@ class AppHandler(BaseHTTPRequestHandler):
                 """,
                 params,
             ).fetchall()
+
+            total = dict(total)
+            opening = 0
+            date_from = query.get("date_from", [""])[0]
+            if date_from:
+                opening_query = {key: value for key, value in query.items() if key not in ("date_from", "date_to")}
+                opening_where, opening_params = filters_from_query(opening_query)
+                opening_where += (" AND " if opening_where else " WHERE ") + "t.occurred_at < ?"
+                opening = db.execute(
+                    f"SELECT COALESCE(SUM(CASE WHEN t.kind = 'deposit' THEN t.amount_cents ELSE -t.amount_cents END), 0) FROM transactions t {opening_where}",
+                    [*opening_params, date_from],
+                ).fetchone()[0]
+            total["opening_balance_cents"] = opening
+            total["closing_balance_cents"] = opening + total["balance_cents"]
 
             person_name = "Todas las personas"
             type_name = "Todos los tipos de ahorro"

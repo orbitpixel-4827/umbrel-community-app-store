@@ -40,6 +40,52 @@ def validate_snapshot(snapshot):
     }
     if not REQUIRED_TABLES.issubset(tables):
         raise ValueError("La copia no pertenece a Ahorros Familiares.")
+    required_columns = {
+        "people": {"id", "name", "created_at"},
+        "savings_types": {"id", "name", "created_at"},
+        "transactions": {"id", "person_id", "savings_type_id", "kind", "amount_cents", "note", "occurred_at", "created_at"},
+    }
+    for table, required in required_columns.items():
+        table_info = snapshot.execute(f"PRAGMA table_info({table})").fetchall()
+        columns = {row[1] for row in table_info}
+        if not required.issubset(columns):
+            raise ValueError("La copia tiene una estructura incompatible con Ahorros Familiares.")
+        primary_keys = [row for row in table_info if row[5]]
+        if len(primary_keys) != 1 or primary_keys[0][1] != "id" or primary_keys[0][2].upper() != "INTEGER":
+            raise ValueError("La copia tiene identificadores incompatibles con Ahorros Familiares.")
+        invalid_ids = snapshot.execute(
+            f"SELECT 1 FROM {table} GROUP BY id HAVING id IS NULL OR typeof(id) != 'integer' OR COUNT(*) != 1 LIMIT 1"
+        ).fetchone()
+        if invalid_ids:
+            raise ValueError("La copia contiene identificadores inválidos.")
+    if snapshot.execute("PRAGMA foreign_key_check").fetchone():
+        raise ValueError("La copia contiene relaciones inválidas.")
+    invalid = snapshot.execute("""
+        SELECT 1 FROM transactions t
+        LEFT JOIN people p ON p.id = t.person_id
+        LEFT JOIN savings_types s ON s.id = t.savings_type_id
+        WHERE p.id IS NULL OR s.id IS NULL OR t.kind IS NULL
+           OR t.kind NOT IN ('deposit', 'withdrawal')
+           OR typeof(t.amount_cents) != 'integer' OR t.amount_cents <= 0
+        LIMIT 1
+    """).fetchone()
+    if invalid:
+        raise ValueError("La copia contiene movimientos inválidos.")
+    columns = {row[1] for row in snapshot.execute("PRAGMA table_info(transactions)")}
+    if "transfer_id" in columns:
+        invalid_transfer = snapshot.execute("""
+            SELECT 1 FROM transactions WHERE transfer_id IS NOT NULL
+            GROUP BY transfer_id
+            HAVING COUNT(*) != 2 OR COUNT(DISTINCT person_id) != 1
+                OR COUNT(DISTINCT savings_type_id) != 2
+                OR COUNT(DISTINCT amount_cents) != 1
+                OR COUNT(DISTINCT occurred_at) != 1
+                OR SUM(CASE WHEN kind = 'deposit' THEN 1 ELSE 0 END) != 1
+                OR SUM(CASE WHEN kind = 'withdrawal' THEN 1 ELSE 0 END) != 1
+            LIMIT 1
+        """).fetchone()
+        if invalid_transfer:
+            raise ValueError("La copia contiene traspasos incompletos o inconsistentes.")
 
 
 def restore_database(input_stream):

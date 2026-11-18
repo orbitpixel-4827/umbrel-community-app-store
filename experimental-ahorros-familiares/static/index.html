@@ -53,6 +53,8 @@
             </div>
           </div>
 
+          <p id="dashboard-status" class="hidden" role="status"></p>
+          <button id="dashboard-retry" class="button button-secondary hidden" type="button">Reintentar</button>
           <div class="summary-grid" aria-live="polite">
             <article class="balance-card">
               <div class="card-label"><span class="status-dot"></span> Saldo familiar</div>
@@ -183,17 +185,18 @@
                 </table>
                 <div id="history-empty" class="table-empty hidden">Todavía no hay movimientos en esta vista.</div>
               </div>
+              <button id="load-more" class="button button-secondary hidden" type="button">Ver más movimientos</button>
             </article>
           </section>
         </div>
       </main>
     </div>
 
-    <dialog id="people-dialog">
+    <dialog id="people-dialog" aria-labelledby="people-title">
       <form method="dialog" class="dialog-card" data-catalog-form="people">
         <div class="dialog-heading">
-          <div><p class="eyebrow">CATÁLOGO</p><h2>Agregar persona</h2></div>
-          <button class="close-button" value="cancel" aria-label="Cerrar">×</button>
+          <div><p class="eyebrow">CATÁLOGO</p><h2 id="people-title">Agregar persona</h2></div>
+          <button class="close-button" value="cancel" formnovalidate aria-label="Cerrar">×</button>
         </div>
         <p class="dialog-copy">Añade a cualquier integrante que tendrá ahorros individuales.</p>
         <label class="field"><span>Nombre</span><input name="name" maxlength="80" autocomplete="off" placeholder="Ej. Ana" required /></label>
@@ -202,11 +205,11 @@
       </form>
     </dialog>
 
-    <dialog id="types-dialog">
+    <dialog id="types-dialog" aria-labelledby="types-title">
       <form method="dialog" class="dialog-card" data-catalog-form="types">
         <div class="dialog-heading">
-          <div><p class="eyebrow">CATÁLOGO</p><h2>Agregar tipo de ahorro</h2></div>
-          <button class="close-button" value="cancel" aria-label="Cerrar">×</button>
+          <div><p class="eyebrow">CATÁLOGO</p><h2 id="types-title">Agregar tipo de ahorro</h2></div>
+          <button class="close-button" value="cancel" formnovalidate aria-label="Cerrar">×</button>
         </div>
         <p class="dialog-copy">Crea categorías como Emergencias, Vacaciones o Educación.</p>
         <label class="field"><span>Nombre del tipo</span><input name="name" maxlength="80" autocomplete="off" placeholder="Ej. Fondo de emergencia" required /></label>
@@ -215,11 +218,11 @@
       </form>
     </dialog>
 
-    <dialog id="statement-dialog">
+    <dialog id="statement-dialog" aria-labelledby="statement-title">
       <form method="dialog" class="dialog-card" id="statement-form">
         <div class="dialog-heading">
-          <div><p class="eyebrow">DOCUMENTO PDF</p><h2>Generar estado de cuenta</h2></div>
-          <button class="close-button" value="cancel" aria-label="Cerrar">×</button>
+          <div><p class="eyebrow">DOCUMENTO PDF</p><h2 id="statement-title">Generar estado de cuenta</h2></div>
+          <button class="close-button" value="cancel" formnovalidate aria-label="Cerrar">×</button>
         </div>
         <p class="dialog-copy">Elige el alcance. Si dejas las fechas vacías, el documento incluirá todo el historial.</p>
         <div class="field-row">
@@ -234,7 +237,7 @@
       </form>
     </dialog>
 
-    <dialog id="delete-dialog" class="confirmation-dialog">
+    <dialog id="delete-dialog" class="confirmation-dialog" aria-labelledby="delete-title" aria-describedby="delete-message">
       <form method="dialog" class="dialog-card confirmation-card">
         <div class="dialog-handle" aria-hidden="true"></div>
         <div class="confirmation-icon" aria-hidden="true">

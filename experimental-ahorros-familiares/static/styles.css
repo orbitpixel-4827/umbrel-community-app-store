@@ -24,6 +24,7 @@
 
 * { box-sizing: border-box; }
 html { min-width: 320px; scroll-behavior: smooth; background: var(--ms-bg); }
+#overview, #entry-panel, #history-panel { scroll-margin-top: 100px; }
 body { margin: 0; min-height: 100vh; color: var(--ms-text); background: var(--ms-bg); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Roboto, "Segoe UI", sans-serif; font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
 button, input, select, textarea { font: inherit; }
 button, select { cursor: pointer; }
@@ -87,6 +88,8 @@ select:focus, input:focus, textarea:focus { background: white; border-color: #9f
 .metric-count { --metric-color: var(--ms-blue); }
 .metric-card p { margin: 0 0 7px; color: var(--ms-muted); font-size: 13px; font-weight: 650; }
 .metric-card strong { font-size: 21px; font-weight: 700; letter-spacing: -.025em; white-space: nowrap; }
+.metric-card > div { min-width: 0; }
+.metric-card strong, .balance-card strong { display: block; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .metric-icon { flex: 0 0 auto; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; }
 .metric-icon svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .deposit-icon { color: #287d36; background: var(--ms-green-soft); }
@@ -95,10 +98,10 @@ select:focus, input:focus, textarea:focus { background: white; border-color: #9f
 
 .workspace-grid { margin-top: 24px; display: grid; grid-template-columns: minmax(330px, 400px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .content-stack { display: grid; gap: 20px; min-width: 0; }
-.panel { background: var(--ms-surface); border: 1px solid var(--ms-line); border-radius: var(--ms-radius-card); box-shadow: var(--ms-shadow-soft); }
+.panel { min-width: 0; overflow: hidden; background: var(--ms-surface); border: 1px solid var(--ms-line); border-radius: var(--ms-radius-card); box-shadow: var(--ms-shadow-soft); }
 .entry-panel { padding: 28px; }
 .panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
-.panel-heading.compact { padding: 24px 26px 20px; margin: 0; }
+.panel-heading.compact { padding: 24px 26px 20px; margin: 0; flex-wrap: wrap; }
 .secure-label { min-height: 30px; padding: 5px 11px; display: inline-flex; align-items: center; gap: 6px; color: var(--ms-accent-dark); background: var(--ms-accent-soft); border-radius: 16px; font-size: 12px; font-weight: 750; white-space: nowrap; }
 .secure-label span { color: var(--ms-accent); font-size: 10px; }
 .transaction-form { display: grid; gap: 18px; }
@@ -106,7 +109,7 @@ select:focus, input:focus, textarea:focus { background: white; border-color: #9f
 .movement-toggle legend, .field > span { display: block; margin-bottom: 7px; color: #4d555e; font-size: 13px; font-weight: 680; }
 .movement-toggle legend { grid-column: 1 / -1; padding: 0 8px; background: var(--ms-surface); }
 .toggle-option { min-width: 0; display: block; }
-.toggle-option input { position: absolute; opacity: 0; pointer-events: none; }
+.toggle-option input { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; opacity: 0; pointer-events: none; }
 .toggle-option span { min-height: 43px; display: flex; align-items: center; justify-content: center; gap: 5px; color: var(--ms-muted); border: 1px solid transparent; border-radius: 22px; font-size: 13px; font-weight: 720; transition: background .18s ease, color .18s ease, box-shadow .18s ease; }
 .toggle-option input:focus-visible + span { outline: 3px solid rgba(38,159,163,.28); outline-offset: 2px; }
 .toggle-option input:checked + span { color: var(--ms-text); background: white; border-color: var(--ms-line); box-shadow: 0 4px 12px rgba(42,50,58,.07); }
@@ -174,6 +177,10 @@ dialog::backdrop { background: rgba(34,39,45,.42); backdrop-filter: blur(4px); -
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 
 .mobile-nav { display: none; }
+.dashboard-updating .summary-grid, .dashboard-updating .totals-panel, .dashboard-updating .history-panel { visibility: hidden; }
+#dashboard-status { color: var(--ms-muted); }
+#dashboard-retry { margin-bottom: 16px; }
+#load-more { margin: 16px 24px 24px; }
 .is-loading .summary-grid strong { color: transparent; background: linear-gradient(90deg, #e7e9eb 20%, #f4f5f6 42%, #e7e9eb 64%); background-size: 300% 100%; border-radius: 10px; animation: skeleton 1.4s ease infinite; }
 @keyframes skeleton { from { background-position: 100% 0; } to { background-position: 0 0; } }
 
@@ -185,7 +192,6 @@ dialog::backdrop { background: rgba(34,39,45,.42); backdrop-filter: blur(4px); -
 }
 
 @media (max-width: 840px) {
-  .header-actions .button:first-child { display: none; }
   .workspace-grid { grid-template-columns: 1fr; }
   .section-heading { align-items: flex-start; flex-direction: column; gap: 20px; }
   .filters { width: 100%; }
@@ -194,6 +200,7 @@ dialog::backdrop { background: rgba(34,39,45,.42); backdrop-filter: blur(4px); -
 }
 
 @media (max-width: 620px) {
+  .header-actions .button:first-child { display: none; }
   body { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
   .topbar { min-height: 70px; padding: 10px 18px; }
   .brand-mark { width: 44px; height: 44px; }

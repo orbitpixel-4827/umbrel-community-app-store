@@ -1,4 +1,4 @@
-const state = { people: [], types: [], transactions: [], summary: null, pendingDeletion: null };
+const state = { people: [], types: [], transactions: [], summary: null, pendingDeletion: null, dashboardRequest: 0, historyTotal: 0, nextOffset: null };
 
 const $ = (selector) => document.querySelector(selector);
 const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
@@ -139,7 +139,8 @@ function renderTransactions() {
     </tr>`;
   }).join("");
   const count = visibleItems.length;
-  $("#history-count").textContent = `${count} ${count === 1 ? "registro" : "registros"}`;
+  $("#history-count").textContent = `${count} de ${state.historyTotal} registros`;
+  $("#load-more").classList.toggle("hidden", state.nextOffset === null);
   $("#history-empty").classList.toggle("hidden", count > 0);
 }
 
@@ -150,25 +151,67 @@ async function loadCatalogs() {
   renderCatalogs();
 }
 
-async function loadDashboard() {
+async function loadDashboard(append = false) {
+  const request = ++state.dashboardRequest;
   const query = currentQuery();
-  const [summary, transactions] = await Promise.all([api(`/api/summary${query}`), api(`/api/transactions${query}`)]);
-  state.summary = summary;
-  state.transactions = transactions.items;
-  renderSummary();
-  renderTransactions();
+  const params = new URLSearchParams(query);
+  if (append && state.nextOffset !== null) params.set("offset", state.nextOffset);
+  $("#dashboard-status").textContent = "Actualizando información…";
+  $("#dashboard-status").classList.remove("hidden");
+  $("#dashboard-retry").classList.add("hidden");
+  document.body.classList.add("dashboard-updating");
+  $("#load-more").disabled = true;
+  try {
+    const [summary, transactions] = await Promise.all([api(`/api/summary${query}`), api(`/api/transactions?${params}`)]);
+    if (request !== state.dashboardRequest) return;
+    state.summary = summary;
+    state.transactions = append ? state.transactions.concat(transactions.items) : transactions.items;
+    state.historyTotal = transactions.total;
+    state.nextOffset = transactions.next_offset;
+    renderSummary();
+    renderTransactions();
+    $("#dashboard-status").classList.add("hidden");
+    document.body.classList.remove("dashboard-updating");
+  } catch (error) {
+    if (request !== state.dashboardRequest) return;
+    $("#dashboard-status").textContent = "No se pudo actualizar la información. Reintenta para ver los saldos actuales.";
+    $("#dashboard-retry").classList.remove("hidden");
+    throw error;
+  } finally {
+    if (request === state.dashboardRequest) $("#load-more").disabled = false;
+  }
 }
 
+async function refreshAfterChange(message, refresh = loadDashboard) {
+  toast(message);
+  try {
+    await refresh();
+  } catch (error) {
+    toast(`${message} No se pudo actualizar la vista. No repitas la operación; pulsa Reintentar.`, "error");
+  }
+}
+
+$("#dashboard-retry").addEventListener("click", () => refreshAll().catch((error) => toast(error.message, "error")));
+$("#load-more").addEventListener("click", () => loadDashboard(true).catch((error) => toast(error.message, "error")));
+
 async function refreshAll() {
-  await loadCatalogs();
-  await loadDashboard();
+  try {
+    await loadCatalogs();
+    await loadDashboard();
+  } catch (error) {
+    document.body.classList.add("dashboard-updating");
+    $("#dashboard-status").textContent = "No se pudo actualizar la información. Reintenta para ver los datos actuales.";
+    $("#dashboard-status").classList.remove("hidden");
+    $("#dashboard-retry").classList.remove("hidden");
+    throw error;
+  }
 }
 
 document.addEventListener("click", async (event) => {
   const scrollButton = event.target.closest("[data-scroll-target]");
   if (scrollButton) {
     const target = document.getElementById(scrollButton.dataset.scrollTarget);
-    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    target?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
     document.querySelectorAll(".mobile-nav-item").forEach((item) => item.classList.toggle("is-active", item === scrollButton));
     return;
   }
@@ -210,8 +253,7 @@ $("#delete-dialog form").addEventListener("submit", async (event) => {
     await api(`/api/transactions/${id}`, { method: "DELETE" });
     $("#delete-dialog").close();
     state.pendingDeletion = null;
-    await loadDashboard();
-    toast(isTransfer ? "Traspaso eliminado y saldos actualizados." : "Movimiento eliminado y saldo actualizado.");
+    await refreshAfterChange(isTransfer ? "Traspaso eliminado." : "Movimiento eliminado.");
   } catch (error) {
     toast(error.message, "error");
   } finally {
@@ -239,14 +281,18 @@ for (const form of document.querySelectorAll("[data-catalog-form]")) {
     event.preventDefault();
     const kind = form.dataset.catalogForm;
     const name = new FormData(form).get("name");
+    const button = form.querySelector('button[value="default"]');
+    if (button.disabled) return;
+    button.disabled = true;
     try {
       await api(`/api/${kind}`, { method: "POST", body: JSON.stringify({ name }) });
       form.reset();
       form.closest("dialog").close();
-      await loadCatalogs();
-      toast(kind === "people" ? "Persona agregada." : "Tipo de ahorro agregado.");
+      await refreshAfterChange(kind === "people" ? "Persona agregada." : "Tipo de ahorro agregado.", refreshAll);
     } catch (error) {
       toast(error.message, "error");
+    } finally {
+      button.disabled = false;
     }
   });
 }
@@ -282,8 +328,7 @@ $("#transaction-form").addEventListener("submit", async (event) => {
     $("#transaction-type").value = selectedType;
     $("#transfer-destination").value = selectedDestination;
     updateMovementFields();
-    await loadDashboard();
-    toast("Movimiento guardado y saldo actualizado.");
+    await refreshAfterChange("Movimiento guardado.");
     $("#amount").focus();
   } catch (error) {
     toast(error.message, "error");

@@ -6,3 +6,7 @@
 !static/**
 !tests/
 !tests/**
+betas/
+.preview-data/
+.test-tmp/
+.docker-beta-data/
