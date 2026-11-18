@@ -32,16 +32,31 @@ function normalizeRating(value) {
 }
 
 function normalizeDate(value) {
-  const text = normalizeText(value);
+  const invalid = () => {
+    const error = new Error("La fecha no es válida. Usa una fecha real con formato YYYY-MM-DD o DD/MM/YYYY.");
+    error.statusCode = 400;
+    throw error;
+  };
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return invalid();
+  const text = value.trim();
   if (!text) return null;
   const legacy = text.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
   const iso = legacy ? `${legacy[3]}-${legacy[2]}-${legacy[1]}` : text;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return invalid();
   const date = new Date(`${iso}T12:00:00Z`);
-  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : invalid();
 }
 
-function normalizeItem(input = {}) {
+function normalizeItem(input = {}, supplied = input) {
+  function itemDate(key) {
+    try { return normalizeDate(input[key]); }
+    catch (error) {
+      // Untouched legacy dates must not block unrelated edits.
+      if (!Object.prototype.hasOwnProperty.call(supplied, key)) return input[key] ?? null;
+      throw error;
+    }
+  }
   const category = normalizeText(input.category) || "Película";
   const status = normalizeText(input.status) || "pending";
 
@@ -78,9 +93,9 @@ function normalizeItem(input = {}) {
     external_id: normalizeNullableText(input.external_id),
     personal_rating: normalizeRating(input.personal_rating),
     notes: normalizeNullableText(input.notes),
-    watched_date: normalizeDate(input.watched_date),
-    start_date: normalizeDate(input.start_date),
-    finished_date: normalizeDate(input.finished_date)
+    watched_date: itemDate("watched_date"),
+    start_date: itemDate("start_date"),
+    finished_date: itemDate("finished_date")
   };
 }
 
@@ -245,7 +260,7 @@ async function createItem(input) {
 async function updateItem(id, input) {
   const existing = await getItem(id);
   if (!existing) return null;
-  const item = normalizeItem({ ...existing, ...input });
+  const item = normalizeItem({ ...existing, ...input }, input);
   await run(
     `UPDATE items SET
       title = ?, original_title = ?, category = ?, status = ?, cover_url = ?, year = ?,
@@ -291,3 +306,4 @@ module.exports = {
   closeDatabase: () => new Promise((resolve, reject) => db.close((error) => error ? reject(error) : resolve())),
   dbPath
 };
+

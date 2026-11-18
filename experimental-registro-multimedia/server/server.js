@@ -263,7 +263,7 @@ app.use((error, _req, res, _next) => {
 
 initDatabase()
   .then(() => {
-    app.listen(port, () => {
+    app.listen(port, process.env.HOST || "0.0.0.0", () => {
       console.log(`Registro multimedia listo en puerto ${port}`);
     });
   })
@@ -271,3 +271,4 @@ initDatabase()
     console.error("No se pudo inicializar la base de datos", error);
     process.exit(1);
   });
+

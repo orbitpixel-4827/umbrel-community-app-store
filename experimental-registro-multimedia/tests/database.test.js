@@ -23,6 +23,7 @@ test("old database keeps every record, cover and date through migration and edit
     await run("INSERT INTO items (id,title,category,status,cover_url,finished_date,notes) VALUES (?,?,?,?,?,?,?)",
       [i, `Registro ${i}`, "Libro", "finished", "/uploads/mi-portada.png", "01/04/2026", "Nota conservada"]);
   }
+  await run("UPDATE items SET start_date = '2026-02-30' WHERE id = 3");
   await new Promise((resolve, reject) => old.close(error => error ? reject(error) : resolve()));
   const db = require("../server/database");
   try {
@@ -36,6 +37,14 @@ test("old database keeps every record, cover and date through migration and edit
     assert.equal(edited.finished_date, "2026-04-01");
     assert.equal(edited.cover_url, before.cover_url);
     assert.equal(edited.notes, before.notes);
+    await assert.rejects(db.updateItem(1, { finished_date: "2026-02-30" }), error => error.statusCode === 400);
+    assert.equal((await db.getItem(1)).finished_date, "2026-04-01");
+    await assert.rejects(db.updateItem(1, { finished_date: 123 }), error => error.statusCode === 400);
+    assert.equal((await db.getItem(1)).finished_date, "2026-04-01");
+    assert.equal((await db.updateItem(3, { notes: "Nota sobre fecha histórica" })).start_date, "2026-02-30");
+    const current = await db.updateItem(1, { notes: "Nota nueva de otra sesión" });
+    const changed = await db.updateItem(1, { status: "active" });
+    assert.equal(changed.notes, current.notes);
     for (const category of ["Cómic", "Manga"]) {
       const created = await db.createItem({ title: category, category, status: "pending" });
       assert.equal(created.category, category);
@@ -51,3 +60,4 @@ test("old database keeps every record, cover and date through migration and edit
     fs.rmSync(folder, { recursive: true, force: true });
   }
 });
+

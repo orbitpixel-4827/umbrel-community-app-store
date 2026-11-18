@@ -29,10 +29,10 @@ async function main() {
       return req.on("end", () => {
         const payload = JSON.parse(data);
         const existing = items.find(i => i.id === Number(pathname.split("/").pop()));
-        if (existing) Object.assign(existing, payload);
-        else items.push({ ...payload, id: 300 + saves });
+        const saved = existing ? Object.assign(existing, payload) : { ...payload, id: 300 + saves };
+        if (!existing) items.push(saved);
         saves++;
-        res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(payload));
+        res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(saved));
       });
     }
     if (pathname.startsWith("/api/search/")) { searches++; res.setHeader("Content-Type", "application/json"); return res.end('{"items":[],"warnings":[]}'); }
@@ -47,7 +47,8 @@ async function main() {
     executablePath: process.env.BROWSER_EXECUTABLE || undefined,
     headless: true,
     env: { ...process.env, TMPDIR: path.join(root, "tmp"), XDG_CACHE_HOME: path.join(root, "cache") },
-    viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true
+    viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true,
+    timezoneId: "America/Mexico_City"
   });
   try {
     const page = await context.newPage();
@@ -89,7 +90,7 @@ async function main() {
     await page.screenshot({ path: path.join(root, "iphone-search.png") });
     await page.evaluate(() => { ApiServices.search = async () => { window.testSearches = (window.testSearches || 0) + 1; return { items: [], warnings: [] }; }; });
     await page.locator("#search-title").press("Enter");
-    await page.locator(".empty").filter({ hasText: "No encontré" }).waitFor();
+    await page.locator(".empty").filter({ hasText: /No encontré|La búsqueda no devolvió/ }).waitFor();
     assert.equal(await page.evaluate(() => window.testSearches), 1);
     await page.locator("#modal-search-results [data-open-manual]").click();
     assert.equal(await page.locator("#title").inputValue(), "Monster");
@@ -107,6 +108,118 @@ async function main() {
     assert.equal(items.find(i => i.id === 28).status, "finished");
     assert.equal(items.filter(i => i.title === "Monster").length, 1);
     assert.equal(items.filter(i => i.title === "Otro registro").length, 1);
+
+    // A rejected write must keep the draft and show the error inside the dialog.
+    await page.locator("#open-add-btn").click();
+    await page.locator("#search-form [data-open-manual]").first().click();
+    await page.locator("#title").fill("Guardado con red lenta");
+    let releaseWrite;
+    const writeGate = new Promise(resolve => { releaseWrite = resolve; });
+    const listPattern = "**/api/items";
+    await page.route(listPattern, async route => {
+      if (route.request().method() !== "POST") return route.continue();
+      await writeGate;
+      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Sin conexión de prueba" }) });
+    });
+    await page.locator("#save-item-btn").click();
+    await page.waitForFunction(() => document.querySelector("#title").disabled);
+    assert.equal(await page.locator("#notes").isDisabled(), true);
+    releaseWrite();
+    await page.waitForFunction(() => !document.querySelector("#save-item-btn").disabled);
+    assert.equal(await page.locator("#title").inputValue(), "Guardado con red lenta");
+    const inlineError = page.locator("#item-form [data-dialog-notice]");
+    assert.equal(await inlineError.isVisible(), true);
+    assert.match(await inlineError.innerText(), /Sin conexión/);
+    await page.screenshot({ path: path.join(root, "iphone-inline-error.png") });
+    await page.unroute(listPattern);
+
+    // A successful POST followed by a failed refresh must never invite a second POST.
+    let failRefresh = false;
+    await page.route(listPattern, async route => {
+      if (route.request().method() === "POST") failRefresh = true;
+      if (route.request().method() === "GET" && failRefresh) {
+        failRefresh = false;
+        return route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"Recarga fallida"}' });
+      }
+      return route.continue();
+    });
+    await page.locator("#save-item-btn").click();
+    await page.locator("#item-dialog").waitFor({ state: "hidden" });
+    await page.waitForFunction(() => document.querySelector("#toast").textContent.includes("Registro guardado"));
+    assert.equal(saves, 4);
+    assert.equal(items.filter(i => i.title === "Guardado con red lenta").length, 1);
+    await page.unroute(listPattern);
+
+    await page.locator('[data-view="pending"]').click();
+    await page.locator('[data-open-detail="200"]').click();
+    await page.route("**/api/items/200", route => route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"Estado no guardado"}' }));
+    await page.locator("[data-status-change]").selectOption("active");
+    await page.waitForFunction(() => !document.querySelector("[data-status-change]").disabled);
+    assert.equal(await page.locator("[data-status-change]").inputValue(), "pending");
+    assert.match(await page.locator("#detail-dialog [data-dialog-notice]").innerText(), /Estado no guardado/);
+    await page.unroute("**/api/items/200");
+    items.find(i => i.id === 200).notes = "Nota de otra sesión\nSegundo párrafo";
+    await page.clock.setFixedTime(new Date("2027-01-01T02:00:00Z"));
+    await page.locator("[data-status-change]").selectOption("finished");
+    await page.waitForFunction(() => document.querySelector("[data-status-change]").value === "finished" && !document.querySelector("[data-status-change]").disabled);
+    assert.equal(items.find(i => i.id === 200).notes, "Nota de otra sesión\nSegundo párrafo");
+    assert.equal(items.find(i => i.id === 200).finished_date, "2026-12-31");
+    assert.equal(await page.locator(".personal-notes").evaluate(el => getComputedStyle(el).whiteSpace), "pre-wrap");
+    await page.locator("#detail-dialog [data-close-modal]").click();
+
+    // Responses from a previous search session cannot replace the current results.
+    await page.locator("#open-add-btn").click();
+    await page.evaluate(() => {
+      window.queryResolvers = {};
+      ApiServices.search = query => new Promise(resolve => { window.queryResolvers[query] = resolve; });
+    });
+    await page.locator("#search-title").fill("Consulta vieja");
+    await page.locator("#search-submit-btn").click();
+    await page.locator("#search-dialog [data-close-modal]").click();
+    await page.locator("#open-add-btn").click();
+    await page.locator("#search-title").fill("Consulta vigente");
+    await page.locator("#search-submit-btn").click();
+    await page.evaluate(() => window.queryResolvers["Consulta vigente"]({ items: [{ title: "Resultado vigente", category: "Manga", cover_url: "/portada-no-existe.png" }], warnings: [] }));
+    await page.locator(".result-row h3").filter({ hasText: "Resultado vigente" }).waitFor();
+    await page.evaluate(() => window.queryResolvers["Consulta vieja"]({ items: [{ title: "Resultado obsoleto", category: "Libro" }], warnings: [] }));
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    assert.equal(await page.locator(".result-row h3").innerText(), "Resultado vigente");
+    await page.waitForFunction(() => !document.querySelector(".result-row .poster img"));
+    assert.equal(await page.locator(".result-row .cover-placeholder").isVisible(), true);
+    const compact = await page.locator(".search-poster").evaluate(el => {
+      const outer = el.getBoundingClientRect();
+      const icon = el.querySelector("svg").getBoundingClientRect();
+      return icon.left >= outer.left && icon.right <= outer.right && icon.top >= outer.top && icon.bottom <= outer.bottom;
+    });
+    assert.equal(compact, true, "search fallback icon must fit inside the thumbnail");
+    await page.locator("#search-dialog [data-close-modal]").click();
+    await page.locator('[data-view="library"]').click();
+    await page.locator('[data-filter="libraryCategory"]').focus();
+    await page.locator('[data-filter="libraryCategory"]').selectOption("Libro");
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.filter), "libraryCategory");
+    await page.locator('[data-filter="libraryCategory"]').selectOption("all");
+    await page.locator('[data-library-page="next"]').click();
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.libraryPage), "next");
+    await page.locator('[data-view="home"]').click();
+    await page.locator('[data-open-detail="200"]').click();
+    let releaseStatus;
+    const statusGate = new Promise(resolve => { releaseStatus = resolve; });
+    await page.route("**/api/items/200", async route => { await statusGate; await route.continue(); });
+    await page.locator("[data-status-change]").selectOption("active");
+    await page.locator("#detail-dialog [data-close-modal]").click();
+    await page.locator("#open-add-btn").click();
+    await page.locator("#search-form [data-open-manual]").first().click();
+    await page.locator("#title").fill("Borrador mientras cambia estado");
+    const lateResponse = page.waitForResponse(response => response.url().endsWith("/api/items/200") && response.request().method() === "PUT");
+    releaseStatus();
+    await lateResponse;
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    assert.equal(await page.locator("#detail-dialog").isVisible(), false);
+    assert.equal(await page.locator("#title").inputValue(), "Borrador mientras cambia estado");
+    await page.unroute("**/api/items/200");
+    await page.locator("#item-dialog [data-close-modal]").first().click();
+    await page.locator("#confirm-action").click();
+    await page.locator("#item-dialog").waitFor({ state: "hidden" });
     await page.locator('[data-view="stats"]').click();
     assert.equal(await page.locator(".stat").count(), 5);
     assert.equal(await page.locator("canvas").count(), 1);
@@ -120,7 +233,8 @@ async function main() {
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `overflow at ${size}`);
     }
     assert.deepEqual(errors, []);
-    console.log("UI verificada: 137 registros, paginación, orden, filtros, fechas heredadas, portadas, Enter, guardado consecutivo y vistas 320-1440px.");
+    console.log("UI verificada: 137 registros, paginación, filtros, fechas heredadas, guardado consecutivo, fallos de red, errores visibles, borradores protegidos, búsquedas fuera de orden, notas, fecha local, foco y vistas 320-1440px.");
   } finally { await context.close(); await new Promise(resolve => server.close(resolve)); }
 }
 main().catch(error => { console.error(error); process.exit(1); });
+

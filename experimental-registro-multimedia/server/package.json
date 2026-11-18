@@ -1,6 +1,6 @@
 {
   "name": "registro-multimedia-self-hosted",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Registro multimedia self-hosted para UmbrelOS",
   "main": "server.js",
   "scripts": {
@@ -15,4 +15,3 @@
     "node": ">=20"
   }
 }
-

@@ -4,7 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - "experimental-registro-multimedia/**"
+      - "experimental-registro-multimedia/Dockerfile"
+      - "experimental-registro-multimedia/.dockerignore"
+      - "experimental-registro-multimedia/server/**"
+      - "experimental-registro-multimedia/public/**"
+      - "experimental-registro-multimedia/tests/**"
+      - "experimental-registro-multimedia/tools/verify-ui.cjs"
       - ".github/workflows/registro-multimedia-image.yml"
   workflow_dispatch:
 
@@ -33,7 +38,7 @@ jobs:
           node --check public/app.js
           node --check public/api-services.js
           node --check server/server.js
-          node --test tests/database.test.js
+          node --test tests/database.test.js tests/api.test.cjs
 
   build:
     needs: verify
@@ -53,8 +58,8 @@ jobs:
           context: ./experimental-registro-multimedia
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/orbitpixel-4827/registro-multimedia:2.0.0
+          tags: ghcr.io/orbitpixel-4827/registro-multimedia:2.0.1
           labels: |
             org.opencontainers.image.title=Registro Multimedia
             org.opencontainers.image.source=https://github.com/orbitpixel-4827/umbrel-community-app-store
-            org.opencontainers.image.version=2.0.0
+            org.opencontainers.image.version=2.0.1

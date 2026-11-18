@@ -8,6 +8,8 @@ const App = (() => {
     searchWarnings: [],
     hasSearched: false,
     searching: false,
+    searchRequest: 0,
+    deleting: false,
     filters: {
       libraryCategory: "all",
       libraryYear: "all",
@@ -79,6 +81,21 @@ const App = (() => {
   }
 
   function toast(message) {
+    const activeDialog = $(".modal[open]:not(#confirm-dialog)");
+    if (activeDialog) {
+      let notice = $("[data-dialog-notice]", activeDialog);
+      if (!notice) {
+        notice = document.createElement("p");
+        notice.className = "notice";
+        notice.dataset.dialogNotice = "";
+        notice.setAttribute("role", "alert");
+        $(".modal-card", activeDialog).append(notice);
+      }
+      notice.textContent = message;
+      notice.hidden = false;
+      notice.scrollIntoView({ block: "nearest", behavior: "auto" });
+      return;
+    }
     const el = $("#toast");
     el.textContent = message;
     el.classList.add("show");
@@ -101,6 +118,29 @@ const App = (() => {
 
   async function loadItems() {
     state.items = await api("/api/items");
+  }
+
+  function upsertItem(item) {
+    const index = state.items.findIndex(entry => String(entry.id) === String(item.id));
+    if (index < 0) state.items.push(item);
+    else state.items[index] = item;
+  }
+
+  async function refreshAfterWrite(message) {
+    try { await loadItems(); }
+    catch (error) {
+      console.warn("[Registro multimedia] Guardado confirmado; falló la recarga", error);
+      render();
+      toast(`${message} No se pudo actualizar la lista completa; vuelve a cargar cuando recuperes conexión.`);
+      return;
+    }
+    render();
+    toast(message);
+  }
+
+  function localToday() {
+    const date = new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
 
   function switchView(view) {
@@ -178,6 +218,7 @@ const App = (() => {
   }
 
   function dateYear(value) {
+    if (parseDateValue(value) === null) return "";
     const parts = dateParts(value);
     return parts?.year ? String(parts.year) : "";
   }
@@ -216,7 +257,7 @@ const App = (() => {
 
   function imageHtml(item, className = "") {
     const title = escapeHtml(item.title || "Sin título");
-    const fallback = `<span class="poster-fallback"><i data-lucide="image"></i>${title}</span>`;
+    const fallback = `<span class="poster-fallback"><i data-lucide="image"></i>${className === "search-poster" ? "" : title}</span>`;
     return `<div class="poster ${className}">${item.cover_url ? `<img src="${escapeHtml(item.cover_url)}" alt="Portada de ${title}" loading="lazy">` : ""}<span class="cover-placeholder" ${item.cover_url ? "hidden" : ""}>${fallback}</span></div>`;
   }
 
@@ -416,6 +457,8 @@ const App = (() => {
 
   function render() {
     const app = $("#app");
+    const active = document.activeElement;
+    const focusData = app.contains(active) ? { ...active.dataset } : null;
     if (state.chart) {
       state.chart.destroy();
       state.chart = null;
@@ -427,12 +470,23 @@ const App = (() => {
     if (state.view === "wishlist") app.innerHTML = renderStatusList("wishlist", "wishlistCategory", "No hay registros en lista de deseos.");
     if (state.view === "stats") app.innerHTML = renderStats();
     refreshIcons();
+    if (focusData) {
+      let control;
+      if (focusData.filter) control = $(`[data-filter="${focusData.filter}"]`);
+      if (focusData.libraryPage) {
+        control = $(`[data-library-page="${focusData.libraryPage}"]:not(:disabled)`)
+          || $("[data-library-page]:not(:disabled)");
+      }
+      if (control) control.focus({ preventScroll: true });
+    }
   }
 
   function openModal(item = null) {
     const dialog = $("#item-dialog");
     const form = $("#item-form");
     form.reset();
+    const notice = $("[data-dialog-notice]", form);
+    if (notice) notice.hidden = true;
     // Hidden input values also update their defaults, so reset() alone keeps the last ID.
     for (const name of ["id", "source", "external_id"]) form.elements[name].value = "";
     state.saving = false;
@@ -464,6 +518,9 @@ const App = (() => {
     state.searchWarnings = [];
     state.hasSearched = false;
     state.searching = false;
+    state.searchRequest += 1;
+    $("#search-submit-btn").disabled = false;
+    $("#search-submit-btn").textContent = "Buscar";
     renderSearchModalResults();
     dialog.showModal();
     setTimeout(() => $("#search-title")?.focus(), 50);
@@ -492,7 +549,7 @@ const App = (() => {
         ${warnings}
         <div class="empty">
           <div>
-            <p>No encontré coincidencias para "${escapeHtml(state.searchQuery)}".</p>
+            <p>${state.searchWarnings.length ? "La búsqueda no devolvió resultados. Revisa los avisos de las fuentes." : `No encontré coincidencias para "${escapeHtml(state.searchQuery)}".`}</p>
             <br>
             <button class="button primary" type="button" data-open-manual>Agregar manualmente</button>
           </div>
@@ -507,7 +564,7 @@ const App = (() => {
         .map(
           (item, index) => `
           <div class="result-row">
-            ${item.cover_url ? `<img src="${escapeHtml(item.cover_url)}" alt="">` : `<div class="poster"><span class="poster-fallback">${escapeHtml(item.category)}</span></div>`}
+            ${imageHtml(item, "search-poster")}
             <div>
               <h3>${escapeHtml(item.title)}</h3>
               <p class="muted">${[item.year, item.creator, item.source].filter(Boolean).map(escapeHtml).join(" · ")}</p>
@@ -519,10 +576,13 @@ const App = (() => {
         )
         .join("")}
     `;
+    refreshIcons();
   }
 
   async function submitSearch(event) {
     event.preventDefault();
+    if (state.searching) return;
+    const request = ++state.searchRequest;
     const query = $("#search-title").value.trim();
     const category = $("#search-category").value;
     state.searchQuery = query;
@@ -544,15 +604,18 @@ const App = (() => {
 
     try {
       const result = await ApiServices.search(query, category);
+      if (request !== state.searchRequest || !$("#search-dialog").open) return;
       state.searchResults = result.items || [];
       state.searchWarnings = result.warnings || [];
       if (!state.searchResults.length && !state.searchWarnings.length) {
         state.searchWarnings = ["No hubo resultados en las fuentes configuradas."];
       }
     } catch (error) {
+      if (request !== state.searchRequest) return;
       console.error("[Registro multimedia] Error buscando contenido", error);
       state.searchWarnings = ["No se pudo completar la búsqueda. Revisa la consola del navegador."];
     } finally {
+      if (request !== state.searchRequest) return;
       state.searching = false;
       $("#search-submit-btn").disabled = false;
       $("#search-submit-btn").textContent = "Buscar";
@@ -568,6 +631,8 @@ const App = (() => {
   }
 
   function closeModals() {
+    state.searchRequest += 1;
+    state.searching = false;
     $$(".modal[open]").forEach((dialog) => dialog.close());
   }
 
@@ -616,21 +681,28 @@ const App = (() => {
     const existingItem = id ? state.items.find((item) => String(item.id) === String(id)) : null;
 
     state.saving = true;
+    const controls = [...form.elements].map(control => [control, control.disabled]);
+    const notice = $("[data-dialog-notice]", form);
+    if (notice) notice.hidden = true;
     $("#save-item-btn").disabled = true;
     $("#save-item-btn").textContent = "Guardando...";
     try {
-      const payload = await uploadCoverIfNeeded(form, formPayload(form, existingItem));
-      if (id) await api(`/api/items/${id}`, { method: "PUT", body: JSON.stringify(payload) });
-      else await api("/api/items", { method: "POST", body: JSON.stringify(payload) });
-      await loadItems();
+      const draft = formPayload(form, existingItem);
+      controls.forEach(([control]) => { control.disabled = true; });
+      const payload = await uploadCoverIfNeeded(form, draft);
+      const saved = await api(id ? `/api/items/${id}` : "/api/items", {
+        method: id ? "PUT" : "POST", body: JSON.stringify(payload)
+      });
+      upsertItem(saved);
       closeModals();
       form.reset();
-      render();
-      toast(id ? "Registro actualizado." : "Registro guardado.");
+      state.formDirty = false;
+      await refreshAfterWrite(id ? "Registro actualizado." : "Registro guardado.");
     } catch (error) {
       toast(error.message);
     } finally {
       state.saving = false;
+      controls.forEach(([control, disabled]) => { control.disabled = disabled; });
       $("#save-item-btn").disabled = false;
       $("#save-item-btn").textContent = "Guardar";
     }
@@ -639,6 +711,7 @@ const App = (() => {
   function detailModal(item) {
     if (!item) return;
     const dialog = $("#detail-dialog");
+    dialog.dataset.itemId = String(item.id);
     dialog.innerHTML = `
       <div class="modal-card" data-category="${escapeHtml(item.category)}">
         <div class="modal-header">
@@ -660,7 +733,7 @@ const App = (() => {
             ${item.genres ? `<p><strong>Géneros:</strong> ${escapeHtml(item.genres)}</p>` : ""}
             ${item.finished_date ? `<p><strong>Finalizado:</strong> ${formatDate(item.finished_date)}</p>` : ""}
             ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
-            ${item.notes ? `<p><strong>Notas:</strong> ${escapeHtml(item.notes)}</p>` : ""}
+            ${item.notes ? `<div><strong>Notas:</strong><p class="personal-notes">${escapeHtml(item.notes)}</p></div>` : ""}
             <label class="field">
               <span>Cambiar estado</span>
               <select data-status-change="${item.id}">
@@ -682,13 +755,25 @@ const App = (() => {
   async function changeStatus(id, status) {
     const item = state.items.find((entry) => String(entry.id) === String(id));
     if (!item) return;
-    const payload = { ...item, status };
-    if (status === "finished" && !payload.finished_date) payload.finished_date = new Date().toISOString().slice(0, 10);
-    await api(`/api/items/${id}`, { method: "PUT", body: JSON.stringify(payload) });
-    await loadItems();
-    render();
-    detailModal(state.items.find((entry) => String(entry.id) === String(id)));
-    toast("Estado actualizado.");
+    const dialog = $("#detail-dialog");
+    const selector = $("[data-status-change]", dialog);
+    const isCurrent = () => dialog.open && dialog.dataset.itemId === String(id) && dialog.contains(selector);
+    if (selector.disabled) return;
+    selector.disabled = true;
+    const payload = { status };
+    if (status === "finished" && !item.finished_date) payload.finished_date = localToday();
+    try {
+      const saved = await api(`/api/items/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+      upsertItem(saved);
+      render();
+      if (isCurrent()) {
+        detailModal(saved);
+        toast("Estado actualizado.");
+      }
+    } catch (error) {
+      selector.value = item.status;
+      if (isCurrent()) toast(error.message);
+    } finally { selector.disabled = false; }
   }
 
   function bindEvents() {
@@ -722,14 +807,19 @@ const App = (() => {
         if (item) openModal(item);
       }
       if (target.dataset.delete) {
+        if (state.deleting) return;
         const item = state.items.find((entry) => String(entry.id) === target.dataset.delete);
         if (!item) return;
         if (!await askConfirmation("¿Eliminar registro?", `Se eliminará «${item.title}». Esta acción no se puede deshacer.`)) return;
-        await api(`/api/items/${item.id}`, { method: "DELETE" });
-        await loadItems();
-        closeModals();
-        render();
-        toast("Registro eliminado.");
+        state.deleting = true;
+        target.disabled = true;
+        try {
+          await api(`/api/items/${item.id}`, { method: "DELETE" });
+          state.items = state.items.filter(entry => String(entry.id) !== String(item.id));
+          closeModals();
+          await refreshAfterWrite("Registro eliminado.");
+        } catch (error) { toast(error.message); }
+        finally { state.deleting = false; target.disabled = false; }
       }
     });
 
@@ -761,6 +851,10 @@ const App = (() => {
     document.addEventListener("change", async (event) => {
       if (event.target.closest("#item-form")) state.formDirty = true;
       if (event.target.id === "search-category") {
+        state.searchRequest += 1;
+        state.searching = false;
+        $("#search-submit-btn").disabled = false;
+        $("#search-submit-btn").textContent = "Buscar";
         state.searchCategory = event.target.value;
         state.searchResults = [];
         state.searchWarnings = [];
@@ -779,6 +873,10 @@ const App = (() => {
 
     $("#item-form").addEventListener("submit", saveItem);
     $("#search-form").addEventListener("submit", submitSearch);
+    $("#search-dialog").addEventListener("close", () => {
+      state.searchRequest += 1;
+      state.searching = false;
+    });
     $("#item-dialog").addEventListener("cancel", (event) => {
       event.preventDefault();
       requestClose();
@@ -808,3 +906,4 @@ const App = (() => {
 })();
 
 document.addEventListener("DOMContentLoaded", App.init);
+
