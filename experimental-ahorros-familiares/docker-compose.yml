@@ -3,7 +3,7 @@ version: "3.7"
 services:
   # Prepare Umbrel's bind mount before starting the unprivileged application.
   init_data:
-    image: ghcr.io/orbitpixel-4827/ahorros-familiares:1.0.0@sha256:3c5f409f63193c2d66fd50a7f1141ed4aecbffa762908f76a8668dd2401e6059
+    image: ghcr.io/orbitpixel-4827/ahorros-familiares:1.1.0@sha256:8eb5e87427cc1b8243de8c091fb35ea267dae4329b449036afb872ef2f7e704b
     user: "0:0"
     restart: on-failure
     network_mode: none
@@ -51,7 +51,7 @@ services:
       APP_PORT: 8080
 
   web:
-    image: ghcr.io/orbitpixel-4827/ahorros-familiares:1.0.0@sha256:3c5f409f63193c2d66fd50a7f1141ed4aecbffa762908f76a8668dd2401e6059
+    image: ghcr.io/orbitpixel-4827/ahorros-familiares:1.1.0@sha256:8eb5e87427cc1b8243de8c091fb35ea267dae4329b449036afb872ef2f7e704b
     user: "1000:1000"
     init: true
     restart: on-failure
