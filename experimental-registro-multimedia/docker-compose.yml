@@ -9,7 +9,7 @@ services:
       PROXY_AUTH_WHITELIST: "/icons/*,/manifest.json"
 
   web:
-    image: ghcr.io/orbitpixel-4827/registro-multimedia:2.0.0
+    image: ghcr.io/orbitpixel-4827/registro-multimedia:2.0.1
     init: true
     restart: on-failure
     stop_grace_period: 30s

@@ -4,7 +4,7 @@ name: Registro Multimedia
 tagline: Tu biblioteca personal de historias y juegos
 icon: https://raw.githubusercontent.com/orbitpixel-4827/umbrel-community-app-store/main/experimental-registro-multimedia/public/icons/icon-512.png
 category: media
-version: "2.0.0"
+version: "2.0.1"
 port: 3420
 description: >-
   Organiza películas, libros, videojuegos, cómics y manga en una biblioteca privada.
@@ -20,8 +20,10 @@ repo: https://github.com/orbitpixel-4827/umbrel-community-app-store
 support: https://github.com/orbitpixel-4827/umbrel-community-app-store/issues
 gallery: []
 releaseNotes: >-
-  Rediseño MiEstilo, ícono para iPhone y acceso por IP local o Tailscale.
-  Biblioteca paginada, cinco categorías y compatibilidad con las bases de datos anteriores.
+  Corrige duplicados tras errores de recarga, protege borradores al guardar y muestra
+  errores dentro de los formularios. Mejora cambios de estado, fechas locales,
+  resultados de búsqueda, foco, notas y portadas rotas. Conserva los datos y volúmenes
+  existentes; no requiere volver a migrar.
 dependencies: []
 path: ""
 defaultUsername: ""
